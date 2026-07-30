@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * hud — standalone Claude Code statusline.
- * Renders: [HUD] | Model: X | 5h:[####----]N%(4h38m) | wk:[#-------]N%(6d10h) | session:Nm | ctx:[##--------]N%
+ * Renders: Model: X | 5h:[####----]N%(4h38m) | wk:[#-------]N%(6d10h) | session:Nm | ctx:[##--------]N%
  * Data: Claude Code statusline stdin JSON (primary); OAuth usage API (fallback for rate limits).
  * Zero dependencies. Never throws: worst case prints a minimal line.
  */
@@ -11,7 +11,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 // ---------- ANSI ----------
-const R = "\x1b[0m", DIM = "\x1b[2m", BOLD = "\x1b[1m";
+const R = "\x1b[0m", DIM = "\x1b[2m";
 const RED = "\x1b[31m", GREEN = "\x1b[32m", YELLOW = "\x1b[33m", CYAN = "\x1b[36m";
 const dim = (s) => `${DIM}${s}${R}`;
 const SEP = dim(" | ");
@@ -147,7 +147,6 @@ async function main() {
   const limits = limitsFromStdin(stdin) ?? await limitsFromApi();
 
   const segments = [
-    `${BOLD}[HUD]${R}`,
     modelSegment(stdin),
     limits ? limitSegment("5h", limits.fiveHour.pct, limits.fiveHour.resetsAt) : null,
     limits ? limitSegment("wk", limits.week.pct, limits.week.resetsAt, { dimLabel: true }) : null,
@@ -158,4 +157,4 @@ async function main() {
   console.log(segments.join(SEP));
 }
 
-main().catch(() => console.log("[HUD]"));
+main().catch(() => console.log(`${DIM}hud: err${R}`));

@@ -3,7 +3,7 @@
 My own Claude Code statusline — a single zero-dependency Node script.
 
 ```
-[HUD] | Model: Fable 5 | 5h:[--------]2%(4h37m) | wk:[#-------]9%(6d9h) | session:0m | ctx:[##--------]24%
+Model: Fable 5 | 5h:[--------]2%(4h37m) | wk:[#-------]9%(6d9h) | session:0m | ctx:[##--------]24%
 ```
 
 ## Segments

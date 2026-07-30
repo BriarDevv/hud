@@ -27,4 +27,4 @@ the OMC HUD.
 - Never log to stdout except the single statusline line — Claude Code
   renders whatever this script prints.
 - The script must never exit non-zero or throw: degrade by omitting
-  segments (worst case prints `[HUD]`).
+  segments (worst case prints a dim `hud: err`).
