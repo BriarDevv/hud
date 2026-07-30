@@ -104,7 +104,8 @@ function sessionSegment(stdin) {
   const start = stdin?.transcript_path ? sessionStartMs(stdin.transcript_path) : null;
   if (start) minutes = Math.max(0, Math.floor((Date.now() - start) / 60000));
   const color = minutes > 120 ? RED : minutes > 60 ? YELLOW : GREEN;
-  return `session:${color}${minutes}m${R}`;
+  const label = minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h${minutes % 60}m`;
+  return `session:${color}${label}${R}`;
 }
 
 // ---------- rate limits: stdin first, OAuth usage API fallback ----------
