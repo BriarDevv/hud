@@ -6,7 +6,7 @@
  * Zero dependencies. Never throws: worst case prints a minimal line.
  */
 
-import { readFileSync, writeFileSync, openSync, readSync, closeSync } from "node:fs";
+import { readFileSync, writeFileSync, openSync, readSync, closeSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -79,21 +79,30 @@ function contextSegment(stdin) {
   return `ctx:${bar(p, 10, color)}${color}${p}%${suffix}${R}`;
 }
 
-// Session start = timestamp of the first transcript line (head read, cheap).
+// Session start = first timestamped transcript entry. The transcript opens with meta
+// lines (last-prompt, mode, permission-mode) that carry NO timestamp, so scan the head
+// until one appears; fall back to file birthtime.
+function sessionStartMs(path) {
+  try {
+    const fd = openSync(path, "r");
+    const buf = Buffer.alloc(65536);
+    const n = readSync(fd, buf, 0, 65536, 0);
+    closeSync(fd);
+    for (const line of buf.toString("utf8", 0, n).split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const ts = Date.parse(JSON.parse(line)?.timestamp);
+        if (Number.isFinite(ts)) return ts;
+      } catch { /* meta entry or line truncated at the 64KB boundary */ }
+    }
+    return statSync(path).birthtimeMs || null;
+  } catch { return null; }
+}
+
 function sessionSegment(stdin) {
   let minutes = 0;
-  try {
-    const path = stdin?.transcript_path;
-    if (path) {
-      const fd = openSync(path, "r");
-      const buf = Buffer.alloc(4096);
-      const n = readSync(fd, buf, 0, 4096, 0);
-      closeSync(fd);
-      const firstLine = buf.toString("utf8", 0, n).split("\n")[0];
-      const ts = Date.parse(JSON.parse(firstLine)?.timestamp);
-      if (Number.isFinite(ts)) minutes = Math.max(0, Math.floor((Date.now() - ts) / 60000));
-    }
-  } catch { /* fresh session or unreadable transcript -> 0m */ }
+  const start = stdin?.transcript_path ? sessionStartMs(stdin.transcript_path) : null;
+  if (start) minutes = Math.max(0, Math.floor((Date.now() - start) / 60000));
   const color = minutes > 120 ? RED : minutes > 60 ? YELLOW : GREEN;
   return `session:${color}${minutes}m${R}`;
 }

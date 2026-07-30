@@ -7,6 +7,7 @@ the OMC HUD.
 ## Commands
 
 - `node hud.mjs < test/sample-stdin.json` — render with the sample payload
+  (run from the repo root: the sample's transcript_path is relative)
 - `echo '{}' | node hud.mjs` — exercise the OAuth usage-API fallback path
 
 ## Gotchas
