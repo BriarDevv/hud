@@ -1,0 +1,28 @@
+{
+  "model": {
+    "id": "claude-fable-5",
+    "display_name": "Fable 5"
+  },
+  "transcript_path": "C:/nonexistent/fake.jsonl",
+  "cwd": "C:/Briar/repos/mine/hud",
+  "context_window": {
+    "context_window_size": 200000,
+    "total_input_tokens": 0,
+    "used_percentage": 24,
+    "current_usage": {
+      "input_tokens": 40000,
+      "cache_creation_input_tokens": 5000,
+      "cache_read_input_tokens": 3000
+    }
+  },
+  "rate_limits": {
+    "five_hour": {
+      "used_percentage": 2,
+      "resets_at": "2026-07-30T13:01:35.335Z"
+    },
+    "seven_day": {
+      "used_percentage": 9,
+      "resets_at": "2026-08-05T18:23:35.335Z"
+    }
+  }
+}
