@@ -1,15 +1,12 @@
-# SPEC: Responsive statusline + Fable limit segment
+# SPEC: Responsive statusline wrap
 
 ## Problem
 
 `hud.mjs` renders one long line. On a narrow terminal, the segments get
 truncated/wrapped by the terminal itself, mid-segment, instead of wrapping
-cleanly at segment boundaries. Separately, there's no segment for the
-`fable` rate-limit window Claude Code can send in `rate_limits`.
+cleanly at segment boundaries.
 
 ## Design
-
-### 1. Responsive wrap
 
 - `visibleWidth(str)`: strips ANSI escape codes (`/\x1b\[[0-9;]*m/g`) and
   returns the remaining length, since rendered segments carry color codes
@@ -29,31 +26,15 @@ cleanly at segment boundaries. Separately, there's no segment for the
   `console.log` call — still "the one statusline print", just
   potentially multi-line. Claude Code renders each line as its own row.
 
-### 2. `fb:` segment (Fable limit)
-
-- `limitsFromStdin`: adds `fable: { pct: rl.fable?.used_percentage,
-  resetsAt: rl.fable?.resets_at }` to the returned object. The "no data"
-  early-return now also checks `rl?.fable?.used_percentage`.
-- `limitsFromApi`: sets `fable: { pct: undefined, resetsAt: undefined }`
-  since the OAuth usage API doesn't expose this field — the segment
-  silently doesn't render when limits come from this fallback.
-- `main()`: inserts `limitSegment("fb", limits.fable.pct,
-  limits.fable.resetsAt, { dimLabel: true })` between `wk` and `session`.
-  Final order: `Model | 5h | wk | fb | session | ctx`.
-- `dimLabel: true` — matches `wk`'s dim label styling (user's explicit
-  call, not derived from any confirmed semantics of the `fable` window).
-
 ## Data flow
 
-No new inputs beyond what's already read: `process.env.COLUMNS` (new)
-and `stdin.rate_limits.fable` (new, optional).
+No new inputs beyond what's already read, plus `process.env.COLUMNS` (new).
 
 ## Error handling
 
 Unchanged: everything still runs inside `main().catch(() =>
-console.log(dim("hud: err")))`. A malformed `COLUMNS` value or missing
-`fable` field degrades gracefully (fallback width / segment omitted),
-never throws.
+console.log(dim("hud: err")))`. A malformed `COLUMNS` value degrades
+gracefully (fallback width), never throws.
 
 ## Testing
 
@@ -65,11 +46,25 @@ never throws.
   — wide terminal, single line.
 - `COLUMNS=40 node hud.mjs < test/sample-stdin.json` — narrow, multiple
   lines, no mid-segment cuts.
-- `test/sample-stdin.json` gets a `rate_limits.fable` entry so `fb:`
-  renders in the sample run.
 
 ## Out of scope
 
 - No config for wrap threshold or max lines.
-- No change to how segments are prioritized/dropped — nothing is ever
-  dropped, only wrapped.
+
+## Superseded
+
+A follow-up spec revises the narrow-terminal strategy: instead of (or in
+addition to) wrapping to extra lines, segments shrink to bare percentages
+when the terminal narrows. See the newer spec once written.
+
+## Reverted
+
+An earlier iteration of this change also added an `fb:` segment sourced
+from an assumed `rate_limits.fable` stdin field. That field doesn't exist
+— Claude Code's real stdin only ever sends `rate_limits.five_hour` and
+`rate_limits.seven_day` (confirmed by dumping live stdin). The
+Fable-specific weekly limit shown in Claude Desktop comes from a
+differently-shaped `limits` array in the OAuth usage API
+(`/api/oauth/usage`), not from stdin at all, and reaching it would require
+always hitting that API even when stdin already has rate-limit data. This
+was reverted; `fb:` does not exist in the codebase.

@@ -20,8 +20,6 @@ the OMC HUD.
   fires when stdin carries no rate limits. Fallback reads
   `~/.claude/.credentials.json` and never refreshes the token (Claude Code
   keeps it fresh) — an expired token silently drops the bars, by design.
-  The `fb:` segment (`rate_limits.fable`) is stdin-only — the OAuth usage
-  API doesn't expose it, so `fb:` never renders on the fallback path.
 - Usage-API responses cache 90s in `%TEMP%/hud-usage-cache.json`.
 - Session start is parsed from the FIRST line of the transcript (head read);
   a missing/unreadable transcript renders `session:0m`, not an error.

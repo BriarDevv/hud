@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * hud — standalone Claude Code statusline.
- * Renders: Model: X | 5h:[####----]N%(4h38m) | wk:[#-------]N%(6d10h) | fb:[--------]N%(6d10h) | session:Nm | ctx:[##--------]N%
+ * Renders: Model: X | 5h:[####----]N%(4h38m) | wk:[#-------]N%(6d10h) | session:Nm | ctx:[##--------]N%
  * Wraps onto extra lines at segment boundaries when COLUMNS is too narrow to fit it all.
  * Data: Claude Code statusline stdin JSON (primary); OAuth usage API (fallback for rate limits).
  * Zero dependencies. Never throws: worst case prints a minimal line.
@@ -112,11 +112,10 @@ function sessionSegment(stdin) {
 // ---------- rate limits: stdin first, OAuth usage API fallback ----------
 function limitsFromStdin(stdin) {
   const rl = stdin?.rate_limits;
-  if (rl?.five_hour?.used_percentage == null && rl?.seven_day?.used_percentage == null && rl?.fable?.used_percentage == null) return null;
+  if (rl?.five_hour?.used_percentage == null && rl?.seven_day?.used_percentage == null) return null;
   return {
     fiveHour: { pct: rl.five_hour?.used_percentage, resetsAt: rl.five_hour?.resets_at },
     week: { pct: rl.seven_day?.used_percentage, resetsAt: rl.seven_day?.resets_at },
-    fable: { pct: rl.fable?.used_percentage, resetsAt: rl.fable?.resets_at },
   };
 }
 
@@ -147,7 +146,6 @@ async function limitsFromApi() {
     const data = {
       fiveHour: { pct: body.five_hour?.utilization, resetsAt: body.five_hour?.resets_at },
       week: { pct: body.seven_day?.utilization, resetsAt: body.seven_day?.resets_at },
-      fable: { pct: undefined, resetsAt: undefined }, // not exposed by the usage API
     };
     try { writeFileSync(CACHE_FILE, JSON.stringify({ ts: Date.now(), data })); } catch { /* best effort */ }
     return data;
@@ -199,7 +197,6 @@ async function main() {
     modelSegment(stdin),
     limits ? limitSegment("5h", limits.fiveHour.pct, limits.fiveHour.resetsAt) : null,
     limits ? limitSegment("wk", limits.week.pct, limits.week.resetsAt, { dimLabel: true }) : null,
-    limits ? limitSegment("fb", limits.fable.pct, limits.fable.resetsAt, { dimLabel: true }) : null,
     sessionSegment(stdin),
     contextSegment(stdin),
   ].filter(Boolean);

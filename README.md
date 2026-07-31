@@ -3,7 +3,7 @@
 My own Claude Code statusline — a single zero-dependency Node script.
 
 ```
-Model: Fable 5 | 5h:[--------]2%(4h37m) | wk:[#-------]9%(6d9h) | fb:[--------]5%(6d9h) | session:0m | ctx:[##--------]24%
+Model: Fable 5 | 5h:[--------]2%(4h37m) | wk:[#-------]9%(6d9h) | session:0m | ctx:[##--------]24%
 ```
 
 Wraps onto extra lines (breaking only between segments, never mid-segment)
@@ -15,7 +15,7 @@ in [Test](#test).
 | Segment | Source | Colors |
 |---|---|---|
 | `Model:` | stdin `model.display_name` | cyan |
-| `5h:` / `wk:` / `fb:` | stdin `rate_limits` (`fb` = `rate_limits.fable`, stdin-only), else OAuth usage API for `5h`/`wk` (90s cache) | green <70, yellow ≥70, red ≥90 |
+| `5h:` / `wk:` | stdin `rate_limits`, else OAuth usage API (90s cache) | green <70, yellow ≥70, red ≥90 |
 | `session:` | first transcript line timestamp | yellow >60m, red >120m |
 | `ctx:` | stdin `context_window.used_percentage` (+fallback math) | yellow ≥70, `COMPRESS?` ≥80, `CRITICAL` red ≥85 |
 
