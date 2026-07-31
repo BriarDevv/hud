@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * hud — standalone Claude Code statusline.
- * Renders: Model: X | 5h:[####----]N%(4h38m) | wk:[#-------]N%(6d10h) | session:Nm | ctx:[##--------]N%
+ * Renders: Model: X | 5h:[####----]N%(4h38m) | wk:[#-------]N%(6d10h) | fb:[--------]N%(6d10h) | session:Nm | ctx:[##--------]N%
+ * Wraps onto extra lines at segment boundaries when COLUMNS is too narrow to fit it all.
  * Data: Claude Code statusline stdin JSON (primary); OAuth usage API (fallback for rate limits).
  * Zero dependencies. Never throws: worst case prints a minimal line.
  */
@@ -111,10 +112,11 @@ function sessionSegment(stdin) {
 // ---------- rate limits: stdin first, OAuth usage API fallback ----------
 function limitsFromStdin(stdin) {
   const rl = stdin?.rate_limits;
-  if (rl?.five_hour?.used_percentage == null && rl?.seven_day?.used_percentage == null) return null;
+  if (rl?.five_hour?.used_percentage == null && rl?.seven_day?.used_percentage == null && rl?.fable?.used_percentage == null) return null;
   return {
     fiveHour: { pct: rl.five_hour?.used_percentage, resetsAt: rl.five_hour?.resets_at },
     week: { pct: rl.seven_day?.used_percentage, resetsAt: rl.seven_day?.resets_at },
+    fable: { pct: rl.fable?.used_percentage, resetsAt: rl.fable?.resets_at },
   };
 }
 
@@ -145,10 +147,47 @@ async function limitsFromApi() {
     const data = {
       fiveHour: { pct: body.five_hour?.utilization, resetsAt: body.five_hour?.resets_at },
       week: { pct: body.seven_day?.utilization, resetsAt: body.seven_day?.resets_at },
+      fable: { pct: undefined, resetsAt: undefined }, // not exposed by the usage API
     };
     try { writeFileSync(CACHE_FILE, JSON.stringify({ ts: Date.now(), data })); } catch { /* best effort */ }
     return data;
   } catch { return null; }
+}
+
+// ---------- responsive wrap ----------
+// Claude Code captures our stdout instead of connecting it to the terminal, so
+// COLUMNS/LINES (which it sets before running the script, v2.1.153+) are the only
+// way to read live terminal size. Falls back to 80 so the default leans toward
+// wrapping rather than assuming a wide terminal.
+function terminalWidth() {
+  const cols = parseInt(process.env.COLUMNS, 10);
+  return Number.isFinite(cols) && cols > 0 ? cols : 80;
+}
+
+function visibleWidth(str) {
+  return str.replace(/\x1b\[[0-9;]*m/g, "").length;
+}
+
+// Greedily packs segments onto lines, breaking only at segment boundaries (never
+// mid-segment). A segment that doesn't fit even alone on an empty line is placed
+// anyway and left to overflow visually — better than silently dropping content.
+function wrapSegments(segments, width) {
+  const sepWidth = visibleWidth(SEP);
+  const lines = [];
+  let current = [];
+  let currentWidth = 0;
+  for (const seg of segments) {
+    const segWidth = visibleWidth(seg);
+    if (current.length && currentWidth + sepWidth + segWidth > width) {
+      lines.push(current);
+      current = [];
+      currentWidth = 0;
+    }
+    current.push(seg);
+    currentWidth += current.length > 1 ? sepWidth + segWidth : segWidth;
+  }
+  if (current.length) lines.push(current);
+  return lines.map((line) => line.join(SEP)).join("\n");
 }
 
 // ---------- main ----------
@@ -160,11 +199,12 @@ async function main() {
     modelSegment(stdin),
     limits ? limitSegment("5h", limits.fiveHour.pct, limits.fiveHour.resetsAt) : null,
     limits ? limitSegment("wk", limits.week.pct, limits.week.resetsAt, { dimLabel: true }) : null,
+    limits ? limitSegment("fb", limits.fable.pct, limits.fable.resetsAt, { dimLabel: true }) : null,
     sessionSegment(stdin),
     contextSegment(stdin),
   ].filter(Boolean);
 
-  console.log(segments.join(SEP));
+  console.log(wrapSegments(segments, terminalWidth()));
 }
 
 main().catch(() => console.log(`${DIM}hud: err${R}`));

@@ -23,6 +23,10 @@
     "seven_day": {
       "used_percentage": 9,
       "resets_at": "2026-08-05T18:23:35.335Z"
+    },
+    "fable": {
+      "used_percentage": 5,
+      "resets_at": "2026-08-05T18:23:35.335Z"
     }
   }
 }

@@ -9,6 +9,9 @@ the OMC HUD.
 - `node hud.mjs < test/sample-stdin.json` — render with the sample payload
   (run from the repo root: the sample's transcript_path is relative)
 - `echo '{}' | node hud.mjs` — exercise the OAuth usage-API fallback path
+- `COLUMNS=40 node hud.mjs < test/sample-stdin.json` — simulate a narrow
+  terminal to check the wrap (PowerShell: `$env:COLUMNS=40; node hud.mjs
+  < test/sample-stdin.json`)
 
 ## Gotchas
 
@@ -17,15 +20,26 @@ the OMC HUD.
   fires when stdin carries no rate limits. Fallback reads
   `~/.claude/.credentials.json` and never refreshes the token (Claude Code
   keeps it fresh) — an expired token silently drops the bars, by design.
+  The `fb:` segment (`rate_limits.fable`) is stdin-only — the OAuth usage
+  API doesn't expose it, so `fb:` never renders on the fallback path.
 - Usage-API responses cache 90s in `%TEMP%/hud-usage-cache.json`.
 - Session start is parsed from the FIRST line of the transcript (head read);
   a missing/unreadable transcript renders `session:0m`, not an error.
 - Wired in `~/.claude/settings.json` → `statusLine.command`; changes to
   hud.mjs apply on the next statusline refresh, no restart needed.
+- Terminal width comes from the `COLUMNS` env var, which Claude Code sets
+  to the live terminal size before each run (v2.1.153+) — `tput cols` and
+  `process.stdout.columns` don't work since our stdout is captured, not
+  connected to the terminal. Falls back to 80 when `COLUMNS` is absent or
+  invalid. Segments wrap onto extra lines at segment boundaries when they
+  don't fit; a single segment that doesn't fit even alone still gets
+  printed (overflow), never truncated or dropped.
 
 ## Hard constraints
 
-- Never log to stdout except the single statusline line — Claude Code
-  renders whatever this script prints.
+- Never print anything to stdout other than the statusline content —
+  Claude Code renders whatever this script prints. That content may span
+  multiple lines (wrapped for a narrow terminal); each line becomes its
+  own row, still via a single `console.log` call.
 - The script must never exit non-zero or throw: degrade by omitting
   segments (worst case prints a dim `hud: err`).
