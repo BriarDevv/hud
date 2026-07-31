@@ -33,6 +33,12 @@ the OMC HUD.
   Model → bare `label:%`); `renderLine()` picks the most detailed one that
   fits on one line, printing the barest level anyway (overflow) if even
   that doesn't fit. Never wraps to multiple lines, never truncates text.
+- The script only re-runs (and re-reads `COLUMNS`) on Claude Code's normal
+  refresh triggers — new assistant message, `/compact` finishing, a
+  permission-mode change, vim-mode toggle, or a `refreshInterval` timer.
+  Resizing the terminal alone does NOT trigger a refresh: the shrink/grow
+  only becomes visible next time one of those events fires, not live as
+  you drag the window edge.
 
 ## Hard constraints
 
