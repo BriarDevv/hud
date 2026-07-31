@@ -1,34 +1,45 @@
-# SPEC: Responsive statusline wrap
+# SPEC: Responsive statusline shrink
 
 ## Problem
 
 `hud.mjs` renders one long line. On a narrow terminal, the segments get
-truncated/wrapped by the terminal itself, mid-segment, instead of wrapping
-cleanly at segment boundaries.
+truncated/wrapped by the terminal itself, mid-segment, instead of
+degrading cleanly.
 
 ## Design
 
-- `visibleWidth(str)`: strips ANSI escape codes (`/\x1b\[[0-9;]*m/g`) and
-  returns the remaining length, since rendered segments carry color codes
-  that don't count toward on-screen width.
-- `wrapSegments(segments, width)`: greedily packs segments (in existing
-  order) onto lines. A segment joins the current line if
-  `currentLineWidth + SEP_WIDTH(3) + segmentWidth <= width`; otherwise it
-  starts a new line. If a line is empty, the segment is placed on it
-  regardless of width (extreme-narrow case: never drop or truncate
-  content, let it overflow the terminal visually).
+Content shrinks in stages instead of wrapping to extra lines. Four detail
+levels, most to least detailed, drop order: bars, then `Model:`, then
+reset times + `session:` together (down to bare `label:%`):
+
+- L0 (full): `Model: X | 5h:[bar]N%(reset) | wk:[bar]N%(reset) | session:Nm | ctx:[bar]N%`
+- L1 (no bars): `Model: X | 5h:N%(reset) | wk:N%(reset) | session:Nm | ctx:N%`
+- L2 (no Model): `5h:N%(reset) | wk:N%(reset) | session:Nm | ctx:N%`
+- L3 (bare): `5h:N% | wk:N% | ctx:N%`
+
+`renderLine(levels, width)` tries each level in order and returns the
+first whose visible width (ANSI-stripped) fits `width` on one line. If
+even L3 doesn't fit, it's printed anyway — overflow, never truncated or
+wrapped.
+
+- `limitSegment`/`contextSegment` gain `showBar`/`showReset` options
+  (default `true`) so each level reuses the same segment builders instead
+  of duplicating formatting logic.
+- `buildLevels(stdin, limits)` builds all 4 candidate segment lists.
+- `visibleWidth(str)`: strips ANSI escape codes (`/\x1b\[[0-9;]*m/g`) to
+  measure on-screen width, since rendered segments carry color codes that
+  don't count toward it.
 - Width source: `parseInt(process.env.COLUMNS, 10)`. Claude Code sets
   `COLUMNS`/`LINES` to the live terminal size before invoking the script
-  (v2.1.153+). Falls back to `80` when unset or not a valid number
-  (older Claude Code, or running the script manually) — chosen so the
-  default leans toward wrapping rather than assuming a wide terminal.
-- `main()` joins wrapped lines with `\n` and prints them in a single
-  `console.log` call — still "the one statusline print", just
-  potentially multi-line. Claude Code renders each line as its own row.
+  (v2.1.153+). Falls back to `80` when unset or not a valid number.
+- No fixed column thresholds — each level's fit is measured against the
+  actual rendered width, so it adapts to whatever data is present (e.g.
+  shorter reset strings, missing rate-limit data) rather than assuming a
+  content length.
 
 ## Data flow
 
-No new inputs beyond what's already read, plus `process.env.COLUMNS` (new).
+No new inputs beyond what's already read, plus `process.env.COLUMNS`.
 
 ## Error handling
 
@@ -38,33 +49,23 @@ gracefully (fallback width), never throws.
 
 ## Testing
 
-- `node hud.mjs < test/sample-stdin.json` — default width (no COLUMNS in
-  a piped test run → fallback 80, likely wraps to 2 lines given current
-  segment lengths).
-- `COLUMNS=200 node hud.mjs < test/sample-stdin.json` (bash) /
-  `$env:COLUMNS=200; node hud.mjs < test/sample-stdin.json` (PowerShell)
-  — wide terminal, single line.
-- `COLUMNS=40 node hud.mjs < test/sample-stdin.json` — narrow, multiple
-  lines, no mid-segment cuts.
+- `node hud.mjs < test/sample-stdin.json` — default width (fallback 80).
+- `COLUMNS=200/90/60/35/15 node hud.mjs < test/sample-stdin.json` — walks
+  through all 4 levels down to overflow.
+- `echo {} | node hud.mjs` at various `COLUMNS` — same levels via the
+  OAuth usage-API fallback path.
 
 ## Out of scope
 
-- No config for wrap threshold or max lines.
-
-## Superseded
-
-A follow-up spec revises the narrow-terminal strategy: instead of (or in
-addition to) wrapping to extra lines, segments shrink to bare percentages
-when the terminal narrows. See the newer spec once written.
+- No config for level thresholds.
+- No multi-line wrap — always a single line.
 
 ## Reverted
 
-An earlier iteration of this change also added an `fb:` segment sourced
-from an assumed `rate_limits.fable` stdin field. That field doesn't exist
-— Claude Code's real stdin only ever sends `rate_limits.five_hour` and
-`rate_limits.seven_day` (confirmed by dumping live stdin). The
-Fable-specific weekly limit shown in Claude Desktop comes from a
-differently-shaped `limits` array in the OAuth usage API
-(`/api/oauth/usage`), not from stdin at all, and reaching it would require
-always hitting that API even when stdin already has rate-limit data. This
-was reverted; `fb:` does not exist in the codebase.
+An earlier iteration of this change added multi-line wrapping instead of
+shrinking, and separately an `fb:` segment for a `rate_limits.fable`
+stdin field that turned out not to exist (see git history / prior commits
+on this branch for the discarded designs). Neither survived: wrapping was
+replaced by this staged shrink, and the Fable-specific weekly limit
+Claude Desktop shows comes from a differently-shaped `limits` array in
+the OAuth usage API, not stdin — out of scope here.

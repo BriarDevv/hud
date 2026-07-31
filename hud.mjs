@@ -2,7 +2,8 @@
 /**
  * hud — standalone Claude Code statusline.
  * Renders: Model: X | 5h:[####----]N%(4h38m) | wk:[#-------]N%(6d10h) | session:Nm | ctx:[##--------]N%
- * Wraps onto extra lines at segment boundaries when COLUMNS is too narrow to fit it all.
+ * Shrinks in stages as the terminal narrows: bars go first, then Model, then reset
+ * times + session, down to bare "5h:N% | wk:N% | ctx:N%". Always one line, no wrap.
  * Data: Claude Code statusline stdin JSON (primary); OAuth usage API (fallback for rate limits).
  * Zero dependencies. Never throws: worst case prints a minimal line.
  */
@@ -38,12 +39,13 @@ function formatReset(resetsAt) {
   return d > 0 ? `${d}d${h % 24}h` : `${h}h${m % 60}m`;
 }
 
-function limitSegment(label, pct, resetsAt, { dimLabel = false, width = 8 } = {}) {
+function limitSegment(label, pct, resetsAt, { dimLabel = false, width = 8, showBar = true, showReset = true } = {}) {
   if (pct == null) return null;
   const p = clampPct(pct);
-  const reset = formatReset(resetsAt);
+  const reset = showReset ? formatReset(resetsAt) : null;
   const lbl = dimLabel ? dim(`${label}:`) : `${label}:`;
-  return `${lbl}${bar(p, width, pctColor(p))}${pctColor(p)}${p}%${R}${reset ? dim(`(${reset})`) : ""}`;
+  const barPart = showBar ? bar(p, width, pctColor(p)) : "";
+  return `${lbl}${barPart}${pctColor(p)}${p}%${R}${reset ? dim(`(${reset})`) : ""}`;
 }
 
 // ---------- stdin ----------
@@ -73,11 +75,12 @@ function contextPercent(stdin) {
   return 0;
 }
 
-function contextSegment(stdin) {
+function contextSegment(stdin, { showBar = true } = {}) {
   const p = contextPercent(stdin);
   const color = p >= 85 ? RED : p >= 70 ? YELLOW : GREEN;
   const suffix = p >= 85 ? " CRITICAL" : p >= 80 ? " COMPRESS?" : "";
-  return `ctx:${bar(p, 10, color)}${color}${p}%${suffix}${R}`;
+  const barPart = showBar ? bar(p, 10, color) : "";
+  return `ctx:${barPart}${color}${p}%${suffix}${R}`;
 }
 
 // Session start = first timestamped transcript entry. The transcript opens with meta
@@ -152,11 +155,11 @@ async function limitsFromApi() {
   } catch { return null; }
 }
 
-// ---------- responsive wrap ----------
+// ---------- responsive shrink ----------
 // Claude Code captures our stdout instead of connecting it to the terminal, so
 // COLUMNS/LINES (which it sets before running the script, v2.1.153+) are the only
 // way to read live terminal size. Falls back to 80 so the default leans toward
-// wrapping rather than assuming a wide terminal.
+// shrinking rather than assuming a wide terminal.
 function terminalWidth() {
   const cols = parseInt(process.env.COLUMNS, 10);
   return Number.isFinite(cols) && cols > 0 ? cols : 80;
@@ -166,42 +169,39 @@ function visibleWidth(str) {
   return str.replace(/\x1b\[[0-9;]*m/g, "").length;
 }
 
-// Greedily packs segments onto lines, breaking only at segment boundaries (never
-// mid-segment). A segment that doesn't fit even alone on an empty line is placed
-// anyway and left to overflow visually — better than silently dropping content.
-function wrapSegments(segments, width) {
-  const sepWidth = visibleWidth(SEP);
-  const lines = [];
-  let current = [];
-  let currentWidth = 0;
-  for (const seg of segments) {
-    const segWidth = visibleWidth(seg);
-    if (current.length && currentWidth + sepWidth + segWidth > width) {
-      lines.push(current);
-      current = [];
-      currentWidth = 0;
-    }
-    current.push(seg);
-    currentWidth += current.length > 1 ? sepWidth + segWidth : segWidth;
+// Four detail levels, most to least detailed. Drop order: bars, then Model, then
+// reset times + session together (down to bare label:%). Each level is tried in
+// order and the first that fits `width` on one line wins; if even the barest
+// level doesn't fit, it's printed anyway (overflow, never truncated).
+function buildLevels(stdin, limits) {
+  const model = modelSegment(stdin);
+  const session = sessionSegment(stdin);
+  const fiveHour = (opts) => limits ? limitSegment("5h", limits.fiveHour.pct, limits.fiveHour.resetsAt, opts) : null;
+  const week = (opts) => limits ? limitSegment("wk", limits.week.pct, limits.week.resetsAt, { dimLabel: true, ...opts }) : null;
+
+  const levels = [
+    [model, fiveHour({}), week({}), session, contextSegment(stdin)],
+    [model, fiveHour({ showBar: false }), week({ showBar: false }), session, contextSegment(stdin, { showBar: false })],
+    [fiveHour({ showBar: false }), week({ showBar: false }), session, contextSegment(stdin, { showBar: false })],
+    [fiveHour({ showBar: false, showReset: false }), week({ showBar: false, showReset: false }), contextSegment(stdin, { showBar: false })],
+  ];
+  return levels.map((segs) => segs.filter(Boolean));
+}
+
+function renderLine(levels, width) {
+  for (const segs of levels) {
+    const line = segs.join(SEP);
+    if (visibleWidth(line) <= width) return line;
   }
-  if (current.length) lines.push(current);
-  return lines.map((line) => line.join(SEP)).join("\n");
+  return levels[levels.length - 1].join(SEP);
 }
 
 // ---------- main ----------
 async function main() {
   const stdin = await readStdin();
   const limits = limitsFromStdin(stdin) ?? await limitsFromApi();
-
-  const segments = [
-    modelSegment(stdin),
-    limits ? limitSegment("5h", limits.fiveHour.pct, limits.fiveHour.resetsAt) : null,
-    limits ? limitSegment("wk", limits.week.pct, limits.week.resetsAt, { dimLabel: true }) : null,
-    sessionSegment(stdin),
-    contextSegment(stdin),
-  ].filter(Boolean);
-
-  console.log(wrapSegments(segments, terminalWidth()));
+  const levels = buildLevels(stdin, limits);
+  console.log(renderLine(levels, terminalWidth()));
 }
 
 main().catch(() => console.log(`${DIM}hud: err${R}`));

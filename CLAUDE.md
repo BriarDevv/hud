@@ -9,8 +9,8 @@ the OMC HUD.
 - `node hud.mjs < test/sample-stdin.json` — render with the sample payload
   (run from the repo root: the sample's transcript_path is relative)
 - `echo '{}' | node hud.mjs` — exercise the OAuth usage-API fallback path
-- `COLUMNS=40 node hud.mjs < test/sample-stdin.json` — simulate a narrow
-  terminal to check the wrap (PowerShell: `$env:COLUMNS=40; node hud.mjs
+- `COLUMNS=35 node hud.mjs < test/sample-stdin.json` — simulate a narrow
+  terminal to check the shrink (PowerShell: `$env:COLUMNS=35; node hud.mjs
   < test/sample-stdin.json`)
 
 ## Gotchas
@@ -29,15 +29,15 @@ the OMC HUD.
   to the live terminal size before each run (v2.1.153+) — `tput cols` and
   `process.stdout.columns` don't work since our stdout is captured, not
   connected to the terminal. Falls back to 80 when `COLUMNS` is absent or
-  invalid. Segments wrap onto extra lines at segment boundaries when they
-  don't fit; a single segment that doesn't fit even alone still gets
-  printed (overflow), never truncated or dropped.
+  invalid. `buildLevels()` renders 4 detail levels (full → no bars → no
+  Model → bare `label:%`); `renderLine()` picks the most detailed one that
+  fits on one line, printing the barest level anyway (overflow) if even
+  that doesn't fit. Never wraps to multiple lines, never truncates text.
 
 ## Hard constraints
 
 - Never print anything to stdout other than the statusline content —
-  Claude Code renders whatever this script prints. That content may span
-  multiple lines (wrapped for a narrow terminal); each line becomes its
-  own row, still via a single `console.log` call.
+  Claude Code renders whatever this script prints. Always a single line
+  (content shrinks to fit narrow terminals instead of wrapping).
 - The script must never exit non-zero or throw: degrade by omitting
   segments (worst case prints a dim `hud: err`).

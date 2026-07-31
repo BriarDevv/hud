@@ -6,9 +6,9 @@ My own Claude Code statusline — a single zero-dependency Node script.
 Model: Fable 5 | 5h:[--------]2%(4h37m) | wk:[#-------]9%(6d9h) | session:0m | ctx:[##--------]24%
 ```
 
-Wraps onto extra lines (breaking only between segments, never mid-segment)
-when the terminal is too narrow to fit everything — see `COLUMNS`/`LINES`
-in [Test](#test).
+Shrinks in stages as the terminal narrows — bars go first, then `Model:`,
+then reset times and `session:`, down to bare `5h:2% | wk:9% | ctx:24%`.
+Always one line (see `COLUMNS`/`LINES` in [Test](#test)).
 
 ## Segments
 
@@ -35,7 +35,7 @@ in [Test](#test).
 ```
 node hud.mjs < test/sample-stdin.json
 echo {} | node hud.mjs
-COLUMNS=40 node hud.mjs < test/sample-stdin.json   # narrow terminal: wraps
+COLUMNS=35 node hud.mjs < test/sample-stdin.json   # narrow terminal: shrinks
 ```
 
 Born as a replacement for the OMC HUD (reverse-engineered spec, reimplemented
