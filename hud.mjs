@@ -172,32 +172,50 @@ async function limitsFromApi() {
 // ---------- responsive shrink ----------
 // Claude Code captures our stdout instead of connecting it to the terminal, so
 // COLUMNS/LINES (which it sets before running the script, v2.1.153+) are the only
-// way to read live terminal size. Falls back to 80 so the default leans toward
-// shrinking rather than assuming a wide terminal.
+// way to read live terminal size. COLUMNS isn't reliably set on every refresh
+// trigger, though — when it's missing, reuse the last valid width we saw instead
+// of a fixed 80: on a narrow terminal, an 80-col guess can pick a detail level
+// that overflows and gets clipped by the host. Only a true first run (no COLUMNS
+// ever observed) falls back to 80, leaning toward shrinking over assuming wide.
+const COLUMNS_CACHE_FILE = join(tmpdir(), "hud-columns-cache.json");
+
 function terminalWidth() {
   const cols = parseInt(process.env.COLUMNS, 10);
-  return Number.isFinite(cols) && cols > 0 ? cols : 80;
+  if (Number.isFinite(cols) && cols > 0) {
+    try { writeFileSync(COLUMNS_CACHE_FILE, String(cols)); } catch { /* best effort */ }
+    return cols;
+  }
+  try {
+    const cached = parseInt(readFileSync(COLUMNS_CACHE_FILE, "utf8"), 10);
+    if (Number.isFinite(cached) && cached > 0) return cached;
+  } catch { /* no cache yet */ }
+  return 80;
 }
 
 function visibleWidth(str) {
   return str.replace(/\x1b\[[0-9;]*m/g, "").length;
 }
 
-// Four detail levels, most to least detailed. Drop order: bars, then Model, then
-// reset times + session together (down to bare label:%). Each level is tried in
-// order and the first that fits `width` on one line wins; if even the barest
-// level doesn't fit, it's printed anyway (overflow, never truncated).
+// Five detail levels, most to least detailed. Drop order: 5h/wk bars, then Model,
+// then session, then reset times (down to bare 5h/wk label:%) — reset times
+// outlast session since knowing when a limit frees up is more useful than the
+// session clock, and the context bar outlasts everything since it's the segment
+// most worth a glance even in the tightest terminal. Each level is tried in order
+// and the first that fits `width` on one line wins; if even the barest level
+// doesn't fit, it's printed anyway (overflow, never truncated).
 function buildLevels(stdin, limits) {
   const model = modelSegment(stdin);
   const session = sessionSegment(stdin);
+  const ctx = contextSegment(stdin);
   const fiveHour = (opts) => limits ? limitSegment("5h", limits.fiveHour.pct, limits.fiveHour.resetsAt, opts) : null;
   const week = (opts) => limits ? limitSegment("wk", limits.week.pct, limits.week.resetsAt, { dimLabel: true, ...opts }) : null;
 
   const levels = [
-    [model, fiveHour({}), week({}), session, contextSegment(stdin)],
-    [model, fiveHour({ showBar: false }), week({ showBar: false }), session, contextSegment(stdin, { showBar: false })],
-    [fiveHour({ showBar: false }), week({ showBar: false }), session, contextSegment(stdin, { showBar: false })],
-    [fiveHour({ showBar: false, showReset: false }), week({ showBar: false, showReset: false }), contextSegment(stdin, { showBar: false })],
+    [model, fiveHour({}), week({}), session, ctx],
+    [model, fiveHour({ showBar: false }), week({ showBar: false }), session, ctx],
+    [fiveHour({ showBar: false }), week({ showBar: false }), session, ctx],
+    [fiveHour({ showBar: false }), week({ showBar: false }), ctx],
+    [fiveHour({ showBar: false, showReset: false }), week({ showBar: false, showReset: false }), ctx],
   ];
   return levels.map((segs) => segs.filter(Boolean));
 }
