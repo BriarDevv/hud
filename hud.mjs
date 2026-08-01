@@ -26,17 +26,31 @@ function bar(pct, width, color) {
   return `[${color}${"#".repeat(filled)}${R}${DIM}${"-".repeat(width - filled)}${R}]`;
 }
 
-// "4h38m" | "6d10h" | null when past/absent
-function formatReset(resetsAt) {
+// resetsAt (epoch seconds, epoch ms, or ISO string) -> epoch ms, or null if unparseable
+function resetMs(resetsAt) {
   if (!resetsAt) return null;
   const t = typeof resetsAt === "number"
     ? (Math.abs(resetsAt) < 1e12 ? resetsAt * 1000 : resetsAt)
     : Date.parse(resetsAt);
-  if (!Number.isFinite(t)) return null;
+  return Number.isFinite(t) ? t : null;
+}
+
+// "4h38m" | "6d10h" | null when past/absent
+function formatReset(resetsAt) {
+  const t = resetMs(resetsAt);
+  if (t == null) return null;
   const diff = t - Date.now();
   if (diff <= 0) return null;
   const m = Math.floor(diff / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
   return d > 0 ? `${d}d${h % 24}h` : `${h}h${m % 60}m`;
+}
+
+// stdin's rate_limits are a snapshot from the last API response — stale once its
+// window's resets_at is in the past (e.g. an idle session that hasn't sent a
+// message since the window rolled over).
+function isExpired(resetsAt) {
+  const t = resetMs(resetsAt);
+  return t != null && t <= Date.now();
 }
 
 function limitSegment(label, pct, resetsAt, { dimLabel = false, width = 8, showBar = true, showReset = true } = {}) {
@@ -199,7 +213,9 @@ function renderLine(levels, width) {
 // ---------- main ----------
 async function main() {
   const stdin = await readStdin();
-  const limits = limitsFromStdin(stdin) ?? await limitsFromApi();
+  const stdinLimits = limitsFromStdin(stdin);
+  const stale = stdinLimits && (isExpired(stdinLimits.fiveHour.resetsAt) || isExpired(stdinLimits.week.resetsAt));
+  const limits = stdinLimits && !stale ? stdinLimits : (await limitsFromApi()) ?? stdinLimits;
   const levels = buildLevels(stdin, limits);
   console.log(renderLine(levels, terminalWidth()));
 }
