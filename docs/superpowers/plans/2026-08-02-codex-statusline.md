@@ -78,6 +78,27 @@ test('renderToml emits a complete native Codex fragment', () => {
   assert.match(toml, /"run-state"/);
   assert.doesNotMatch(toml, /token|secret|password|auth/i);
 });
+
+test('updateConfigText replaces status_line without disturbing other tui settings', () => {
+  const original = '# keep\n[tui]\nnotifications = true\nstatus_line = ["old"]\n\n[features]\nfast = true\n';
+  const result = updateConfigText(original, PRESETS.compact);
+  assert.equal(result.changed, true);
+  assert.match(result.text, /notifications = true/);
+  assert.match(result.text, /\[features\]\nfast = true/);
+  assert.match(result.text, /status_line = \["model-with-reasoning"/);
+  assert.doesNotMatch(result.text, /status_line = \["old"\]/);
+});
+
+test('updateConfigText creates tui when it is missing', () => {
+  const result = updateConfigText('model = "gpt-5"\n', PRESETS.compact);
+  assert.equal(result.text, `model = "gpt-5"\n\n${renderToml(PRESETS.compact)}`);
+});
+
+test('updateConfigText preserves CRLF line endings', () => {
+  const result = updateConfigText('[tui]\r\nnotifications = true\r\n', PRESETS.compact);
+  assert.match(result.text, /\r\nstatus_line =/);
+  assert.doesNotMatch(result.text, /(?<!\r)\n/);
+});
 ```
 
 - [ ] **Step 2: Run the focused test to verify it fails for the expected reason**
@@ -148,7 +169,7 @@ git commit -m "feat: add tested Codex statusline catalog"
 
 - [ ] **Step 1: Add failing tests for CLI output and installation safety**
 
-Append tests like these to `test/codex-statusline.test.mjs`:
+Extend the existing top-level imports in `test/codex-statusline.test.mjs` with the standard-library names below, then append the tests. Keep one import declaration for each module and one binding name for each imported helper.
 
 ```js
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
