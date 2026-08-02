@@ -122,6 +122,15 @@ test('CLI --print outputs the requested fragment without creating files', () => 
   assert.match(result.stdout, /"context-remaining"/);
 });
 
+test('CLI --print outputs the focused hud fragment', () => {
+  const cli = join(process.cwd(), 'codex-statusline.mjs');
+  const result = spawnSync(process.execPath, [cli, '--print', '--preset', 'hud'], {
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, renderToml(PRESETS.hud));
+});
+
 test('project-local Codex config stays aligned with the hud preset', () => {
   const projectConfig = readFileSync(join(process.cwd(), '.codex', 'config.toml'), 'utf8');
   assert.equal(projectConfig, renderToml(PRESETS.hud));
@@ -132,9 +141,4 @@ test('hud preset keeps only the requested Codex groups in order', () => {
     'weekly-limit', 'context-used', 'total-input-tokens', 'total-output-tokens',
   ]);
   assert.equal(new Set(PRESETS.hud).size, PRESETS.hud.length);
-});
-
-test('project-local Codex config repeats the hud contract', () => {
-  const projectConfig = readFileSync(join(process.cwd(), '.codex', 'config.toml'), 'utf8');
-  assert.equal(projectConfig, renderToml(PRESETS.hud));
 });
