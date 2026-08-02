@@ -9,7 +9,7 @@
 
 import * as fs from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const BAR_WIDTH = 12;
@@ -74,23 +74,15 @@ export function formatTokenCount(value) {
   return `${text.replace(/\.0$/, '')}${suffix}`;
 }
 
-function hslToRgb(hue, saturation = 0.78, lightness = 0.66) {
-  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
-  const segment = ((hue % 360) + 360) % 360 / 60;
-  const x = chroma * (1 - Math.abs((segment % 2) - 1));
-  const match = lightness - chroma / 2;
-  const [red, green, blue] = segment < 1 ? [chroma, x, 0]
-    : segment < 2 ? [x, chroma, 0]
-      : segment < 3 ? [0, chroma, x]
-        : segment < 4 ? [0, x, chroma]
-          : segment < 5 ? [x, 0, chroma]
-            : [chroma, 0, x];
-  return [red, green, blue].map((channel) => Math.round((channel + match) * 255));
-}
-
 function cellColor(index, phase) {
   const hue = phase + index * (360 / PALETTE.length);
-  const [red, green, blue] = hslToRgb(hue);
+  const position = (((hue % 360) + 360) % 360) / 60;
+  const left = Math.floor(position) % PALETTE.length;
+  const right = (left + 1) % PALETTE.length;
+  const blend = position - Math.floor(position);
+  const [red, green, blue] = PALETTE[left].map((value, channel) => (
+    Math.round(value + (PALETTE[right][channel] - value) * blend)
+  ));
   return `\x1b[38;2;${red};${green};${blue}m`;
 }
 
@@ -204,7 +196,8 @@ function comparablePath(path, platform = process.platform) {
 
 export function findLatestSession({ codexHome, cwd = process.cwd(), sessionId = null, fsModule = fs } = {}) {
   const sessionsRoot = join(codexHome, 'sessions');
-  const expectedCwd = comparablePath(cwd);
+  const absoluteCwd = isAbsolute(cwd) || /^[A-Za-z]:[\\/]/.test(cwd) ? cwd : resolve(cwd);
+  const expectedCwd = comparablePath(absoluteCwd);
   const matches = [];
   for (const path of collectRolloutFiles(sessionsRoot, fsModule)) {
     const meta = parseSessionMeta(path, fsModule);
@@ -292,6 +285,7 @@ function watch({ cwd, sessionId }) {
 
   let snapshot = readCurrentSnapshot({ cwd, sessionId }) ?? {};
   let nextDataRefresh = 0;
+  const color = colorEnabled();
   const refreshMs = 1000;
   const frameMs = 120;
   const timer = setInterval(() => {
@@ -301,7 +295,7 @@ function watch({ cwd, sessionId }) {
       nextDataRefresh = now + refreshMs;
     }
     const phase = (now / frameMs * 14) % 360;
-    process.stdout.write(`\x1b[2K\r${renderLine(snapshot, { color: true, phase })}`);
+    process.stdout.write(`\x1b[2K\r${renderLine(snapshot, { color, phase })}`);
   }, frameMs);
 
   const stop = () => {
@@ -311,7 +305,7 @@ function watch({ cwd, sessionId }) {
   };
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
-  process.stdout.write(`\x1b[2K\r${renderLine(snapshot, { color: true, phase: 0 })}`);
+  process.stdout.write(`\x1b[2K\r${renderLine(snapshot, { color, phase: 0 })}`);
 }
 
 function main(argv = process.argv.slice(2)) {

@@ -43,19 +43,23 @@ the OMC HUD.
 ## Codex compatibility
 
 Codex CLI owns its TUI footer instead of invoking an external statusline
-command. The repository therefore configures Codex through
-`.codex/config.toml` and `codex-statusline.mjs`, while `hud.mjs` remains the
-Claude-only stdin renderer.
+command. The native focused preset therefore uses only
+`weekly-limit`, `context-used`, `total-input-tokens`, and
+`total-output-tokens`, in that order. The companion `codex-hud.mjs` reads
+sanitized token-count events from rollout files to provide the exact aligned
+rainbow line in a separate PowerShell/terminal pane.
 
-- `node codex-statusline.mjs --check` validates the current Codex installation
-  without writing user configuration.
-- `node codex-statusline.mjs --print --preset full` prints the native TOML
-  fragment.
-- `node codex-statusline.mjs --install --preset full` updates
+- `node codex-statusline.mjs --check --preset hud` validates the installed
+  Codex parser without writing configuration.
+- `node codex-statusline.mjs --install --preset hud` updates
   `CODEX_HOME/config.toml` only after an explicit request and creates a
   timestamped backup before changing an existing file.
-- Use `--preset compact` or Codex's `/statusline` command when the full footer
-  is too dense.
+- `node codex-hud.mjs --once --cwd .` renders one deterministic line.
+- `node codex-hud.mjs --watch --cwd .` animates the gradient until Ctrl+C.
+- The companion never reads auth files, prompt text, response text, or
+  provider credentials.
+- `full` and `compact` remain available for contributors who need more native
+  Codex fields.
 
 ## Hard constraints
 

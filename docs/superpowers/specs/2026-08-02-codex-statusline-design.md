@@ -1,7 +1,11 @@
 # Codex Native Statusline Integration Design
 
 **Date:** 2026-08-02  
-**Status:** Approved direction; implementation plan pending
+**Status:** Superseded by `2026-08-02-codex-live-hud-design.md`
+
+> Historical note: this document describes the original full native preset.
+> The current project-local and global default is the focused `hud` preset,
+> with the companion renderer documented in the superseding design.
 
 ## Context
 

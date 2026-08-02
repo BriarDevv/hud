@@ -33,20 +33,33 @@ Always one line (see `COLUMNS`/`LINES` in [Test](#test)).
 ## Codex CLI
 
 Codex owns its TUI footer and does not execute `hud.mjs` as an external
-statusline command. This repo provides a native `tui.status_line` preset with
-model/reasoning, context, rate limits, tokens, Git, project, run state, task,
-session, version, and action fields.
+statusline command. The focused native preset keeps only this order:
 
-```bash
-node codex-statusline.mjs --check                 # read-only validation
-node codex-statusline.mjs --print --preset full   # print TOML
-node codex-statusline.mjs --install --preset full # update CODEX_HOME safely
-node codex-statusline.mjs --install --preset compact
+```text
+weekly → context used → total input → total output
 ```
 
-The project-local `.codex/config.toml` applies the full preset when Codex runs
-from this trusted repository. See [docs/codex-statusline.md](docs/codex-statusline.md)
-for the field list, backup behavior, and version notes.
+Install it globally with a recoverable backup:
+
+```powershell
+node codex-statusline.mjs --check --preset hud
+node codex-statusline.mjs --install --preset hud
+```
+
+For the exact aligned layout and living neon gradient, open a split terminal
+pane and run the companion there:
+
+```powershell
+node codex-hud.mjs --once --cwd (Get-Location)
+node codex-hud.mjs --watch --cwd (Get-Location)
+```
+
+It renders only `weekly`, `context used`, and `28.8K in · 230 out`; bars exist
+only on the first two groups. The companion reads Codex rollout metadata and
+token-count events only. It never reads credentials or prompt/response text.
+The existing `full` and `compact` native presets remain available. See
+[docs/codex-statusline.md](docs/codex-statusline.md) for the native/companion
+boundary, animation behavior, backup flow, and version notes.
 
 ## Test
 

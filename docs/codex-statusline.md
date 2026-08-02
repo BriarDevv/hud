@@ -1,80 +1,109 @@
-# Codex native statusline
+# Codex statusline and live HUD
 
-Codex CLI owns its TUI footer. It does not execute `hud.mjs` as an external
-statusline command, so the Codex integration configures the native
-`tui.status_line` array instead of starting a second renderer.
+Codex CLI owns its TUI footer. It reads an ordered `tui.status_line` array
+from `config.toml`, but it does not execute an external statusline command.
+That gives this repository two complementary surfaces:
 
-## Quick start
+1. a native, compatible footer preset for Codex itself;
+2. a zero-dependency companion line for exact formatting and animation.
+
+## Focused setup
 
 From the repository root:
 
-```bash
-node codex-statusline.mjs --check
-node codex-statusline.mjs --print --preset full
-node codex-statusline.mjs --install --preset full
+```powershell
+node codex-statusline.mjs --check --preset hud
+node codex-statusline.mjs --print --preset hud
+node codex-statusline.mjs --install --preset hud
 ```
 
-`--check` is read-only and validates the preset against the installed Codex
-CLI. `--print` is read-only and emits a copyable TOML fragment. `--install` is
-the only command that writes user configuration; it updates
-`CODEX_HOME/config.toml` (or `~/.codex/config.toml`) and creates a timestamped
-`.bak-*` copy before changing an existing file.
+`--check` is read-only and asks the installed Codex CLI to parse the item IDs.
+`--print` emits a copyable TOML fragment. `--install` is the only command that
+writes user configuration; it updates `CODEX_HOME/config.toml` (or
+`~/.codex/config.toml`) and creates a timestamped `.bak-*` copy before changing
+an existing file.
 
-The repository also contains `.codex/config.toml`, which applies the full
-preset to Codex sessions started in this repository after the project is
-trusted. It contains no authentication, provider, notification, or telemetry
-settings.
+The focused native preset is exactly:
 
-## Presets
+```toml
+[tui]
+status_line = ["weekly-limit", "context-used", "total-input-tokens", "total-output-tokens"]
+```
 
-### `full` (default)
+Codex supplies the values and native labels. Its supported config surface does
+not allow this repository to control ANSI colors, punctuation, or a continuous
+animation.
 
-The full preset shows every useful footer item exposed by the installed Codex
-CLI, in this order:
+## Live companion
 
-| Item | What it shows |
-|---|---|
-| `model-with-reasoning` | Active model and reasoning effort |
-| `context-used` | Context already consumed |
-| `context-remaining` | Context capacity remaining |
-| `five-hour-limit` | Account five-hour rate limit |
-| `weekly-limit` | Account weekly rate limit |
-| `used-tokens` | Tokens used by the current thread |
-| `total-input-tokens` | Total input tokens |
-| `total-output-tokens` | Total output tokens |
-| `git-branch` | Current Git branch |
-| `current-dir` | Current working directory |
-| `project-name` | Codex project name/root label |
-| `run-state` | Current run state |
-| `task-progress` | Active task progress |
-| `fast-mode` | Fast service-tier state |
-| `thread-id` | Current session/thread ID |
-| `thread-title` | Current thread title |
-| `codex-version` | Installed Codex version |
-| `actions` | Available or active TUI actions |
+Open a split terminal pane next to Codex and run:
 
-The full preset favors information completeness and may be dense on narrow
-terminals.
+```powershell
+node codex-hud.mjs --watch --cwd (Get-Location)
+```
 
-### `compact`
+For a one-shot check:
 
-Use this when the full footer is too wide:
+```powershell
+node codex-hud.mjs --once --cwd (Get-Location)
+```
 
-```bash
+The line is deliberately fixed and sparse:
+
+```text
+weekly       [███████████░] 95%  │  context used [█░░░░░░░░░░░] 11%  │  28.8K in · 230 out
+```
+
+Only `weekly` and `context used` have bars. The bars are 12 cells wide and
+filled cells cycle through a restrained neon aurora of violet, cyan, mint,
+lime, amber, and magenta every 120 ms. The data snapshot refreshes once per
+second, so the gradient remains alive when the values are idle. Set `NO_COLOR`
+or pipe `--once` to receive plain Unicode output.
+
+The companion reads only:
+
+- the newest matching `session_meta` working directory;
+- the latest `event_msg` with `payload.type == "token_count"`;
+- weekly usage from the 10,080-minute rate-limit window;
+- model context capacity and total input/output token counts.
+
+It never reads `auth.json`, credentials, prompt text, response text, or
+provider secrets. Missing or partially written data produces `--` placeholders
+and does not fail the process.
+
+Use `--session <id>` when several Codex sessions share the same directory:
+
+```powershell
+node codex-hud.mjs --watch --cwd (Get-Location) --session <session-id>
+```
+
+## Other presets
+
+The helper preserves the previous presets for contributors who want more
+native information:
+
+- `full`: every useful item exposed by the installed Codex CLI;
+- `compact`: model/reasoning, remaining context, both limits, Git branch, and
+  run state;
+- `hud`: the four-item focused footer described above.
+
+Examples:
+
+```powershell
+node codex-statusline.mjs --print --preset full
 node codex-statusline.mjs --install --preset compact
 ```
 
-It keeps model/reasoning, remaining context, both rate limits, Git branch, and
-run state. Codex's `/statusline` command can reorder or hide individual items
-after installation.
+The project-local `.codex/config.toml` intentionally uses `hud` so a trusted
+repository session starts with the calm focused footer. No authentication,
+provider, notification, or telemetry settings are stored there.
 
 ## Version compatibility
 
 Codex status item IDs are owned by the installed Codex version. Run
-`node codex-statusline.mjs --check` after upgrading Codex. If a future version
-changes the available IDs, update the catalog in `codex-statusline.mjs` and the
-project-local `.codex/config.toml` together, then rerun `node --test`.
+`node codex-statusline.mjs --check --preset hud` after upgrading Codex. If a
+future version changes the available IDs or rollout schema, update the catalog
+and companion parser together, then rerun `node --test`.
 
-Claude remains independent: Claude Code still invokes `hud.mjs`, reads its JSON
-stdin payload, and receives the existing one-line ANSI output. The Codex
-helper never reads Claude credentials or the Anthropic usage API.
+Claude remains independent: Claude Code still invokes `hud.mjs`, reads its
+JSON stdin payload, and receives the existing one-line ANSI output.

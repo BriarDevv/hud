@@ -55,6 +55,7 @@ test('renders a fixed-width bar with only the filled cells colored', () => {
   assert.equal(renderBar(95, { color: false, phase: 0 }), '[███████████░]');
   assert.equal(renderBar(null, { color: false, phase: 0 }), '[············]');
   assert.match(renderBar(50, { color: true, phase: 0 }), /\x1b\[38;2;/);
+  assert.notEqual(renderBar(50, { color: true, phase: 0 }), renderBar(50, { color: true, phase: 120 }));
 });
 
 test('renders only weekly, context used, and input/output in order', () => {
