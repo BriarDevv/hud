@@ -33,11 +33,15 @@ export function presetItems(name = 'full') {
   return [...items];
 }
 
-export function renderToml(items) {
+function renderStatusLineArray(items) {
   if (!Array.isArray(items) || items.some((item) => typeof item !== 'string')) {
     throw new TypeError('Statusline items must be an array of strings');
   }
-  return `[tui]\nstatus_line = ${JSON.stringify(items)}\n`;
+  return `[${items.map((item) => JSON.stringify(item)).join(', ')}]`;
+}
+
+export function renderToml(items) {
+  return `[tui]\nstatus_line = ${renderStatusLineArray(items)}\n`;
 }
 
 const TUI_HEADER = /^\s*\[tui\]\s*(?:#.*)?$/;
@@ -59,7 +63,7 @@ function joinLines(lines, eol, trailingEol) {
 
 export function updateConfigText(text, items) {
   if (typeof text !== 'string') throw new TypeError('Configuration text must be a string');
-  const assignment = `status_line = ${JSON.stringify(items)}`;
+  const assignment = `status_line = ${renderStatusLineArray(items)}`;
   const { eol, lines, trailingEol } = splitLines(text);
   const arrayTuiIndex = lines.findIndex((line) => ARRAY_TUI_HEADER.test(line));
   if (arrayTuiIndex >= 0) throw new Error('Unsupported [[tui]] array table');

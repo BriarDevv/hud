@@ -30,12 +30,31 @@ Always one line (see `COLUMNS`/`LINES` in [Test](#test)).
 }
 ```
 
+## Codex CLI
+
+Codex owns its TUI footer and does not execute `hud.mjs` as an external
+statusline command. This repo provides a native `tui.status_line` preset with
+model/reasoning, context, rate limits, tokens, Git, project, run state, task,
+session, version, and action fields.
+
+```bash
+node codex-statusline.mjs --check                 # read-only validation
+node codex-statusline.mjs --print --preset full   # print TOML
+node codex-statusline.mjs --install --preset full # update CODEX_HOME safely
+node codex-statusline.mjs --install --preset compact
+```
+
+The project-local `.codex/config.toml` applies the full preset when Codex runs
+from this trusted repository. See [docs/codex-statusline.md](docs/codex-statusline.md)
+for the field list, backup behavior, and version notes.
+
 ## Test
 
 ```
 node hud.mjs < test/sample-stdin.json
 echo {} | node hud.mjs
 COLUMNS=35 node hud.mjs < test/sample-stdin.json   # narrow terminal: shrinks
+node --test                                      # Claude/Codex regression tests
 ```
 
 Born as a replacement for the OMC HUD (reverse-engineered spec, reimplemented

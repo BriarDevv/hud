@@ -40,6 +40,23 @@ the OMC HUD.
   only becomes visible next time one of those events fires, not live as
   you drag the window edge.
 
+## Codex compatibility
+
+Codex CLI owns its TUI footer instead of invoking an external statusline
+command. The repository therefore configures Codex through
+`.codex/config.toml` and `codex-statusline.mjs`, while `hud.mjs` remains the
+Claude-only stdin renderer.
+
+- `node codex-statusline.mjs --check` validates the current Codex installation
+  without writing user configuration.
+- `node codex-statusline.mjs --print --preset full` prints the native TOML
+  fragment.
+- `node codex-statusline.mjs --install --preset full` updates
+  `CODEX_HOME/config.toml` only after an explicit request and creates a
+  timestamped backup before changing an existing file.
+- Use `--preset compact` or Codex's `/statusline` command when the full footer
+  is too dense.
+
 ## Hard constraints
 
 - Never print anything to stdout other than the statusline content —

@@ -121,3 +121,8 @@ test('CLI --print outputs the requested fragment without creating files', () => 
   assert.match(result.stdout, /\[tui\]/);
   assert.match(result.stdout, /"context-remaining"/);
 });
+
+test('project-local Codex config stays aligned with the full preset', () => {
+  const projectConfig = readFileSync(join(process.cwd(), '.codex', 'config.toml'), 'utf8');
+  assert.equal(projectConfig, renderToml(PRESETS.full));
+});
