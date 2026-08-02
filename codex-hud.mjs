@@ -235,7 +235,13 @@ export function readSessionSnapshot(filePath, fsModule = fs) {
     } catch { /* ignore a partial line written concurrently by Codex */ }
   }
   if (latest && model) latest.model = model;
-  return latest;
+  return latest ?? (model ? {
+    model,
+    weeklyPercent: null,
+    contextPercent: null,
+    inputTokens: null,
+    outputTokens: null,
+  } : null);
 }
 
 export function parseArgs(argv) {

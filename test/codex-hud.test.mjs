@@ -145,6 +145,22 @@ test('reads the latest complete token event and ignores a partial trailing line'
   });
 });
 
+test('keeps the model when a new session has not emitted token counts yet', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hud-codex-model-only-'));
+  const path = join(root, 'rollout.jsonl');
+  writeFileSync(path, [
+    JSON.stringify({ type: 'session_meta', payload: { cwd: 'C:/project' } }),
+    JSON.stringify({ type: 'turn_context', payload: { model: 'gpt-5.6-luna' } }),
+  ].join('\n'));
+  assert.deepEqual(readSessionSnapshot(path), {
+    model: 'gpt-5.6-luna',
+    weeklyPercent: null,
+    contextPercent: null,
+    inputTokens: null,
+    outputTokens: null,
+  });
+});
+
 test('parses one-shot and watch CLI modes without mixing them', () => {
   assert.deepEqual(parseArgs([]), { mode: 'once', cwd: null, sessionId: null });
   assert.deepEqual(parseArgs(['--watch', '--cwd', 'C:/project', '--session', 'abc']), {
