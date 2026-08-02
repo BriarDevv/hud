@@ -1,3 +1,9 @@
+import * as fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /**
  * Codex-native statusline configuration helper.
  *
@@ -83,4 +89,123 @@ export function updateConfigText(text, items) {
 
   const nextText = joinLines(nextLines, eol, trailingEol);
   return { text: nextText, changed: nextText !== text };
+}
+
+export function parseArgs(argv) {
+  let action = null;
+  let preset = 'full';
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--help') return { action: 'help', preset };
+    if (arg === '--print' || arg === '--check' || arg === '--install') {
+      const nextAction = arg.slice(2);
+      if (action && action !== nextAction) throw new Error('Choose one action');
+      action = nextAction;
+      continue;
+    }
+    if (arg === '--preset') {
+      const value = argv[index + 1];
+      if (!value || !Object.hasOwn(PRESETS, value)) throw new Error(`Unknown preset: ${value ?? ''}`);
+      preset = value;
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown option: ${arg}`);
+  }
+  return { action: action ?? 'print', preset };
+}
+
+export function resolveCodexConfigPath(env = process.env, home = homedir()) {
+  const codexHome = env.CODEX_HOME?.trim() || join(home, '.codex');
+  return join(codexHome, 'config.toml');
+}
+
+export function formatBackupPath(configPath, now = new Date()) {
+  const stamp = now.toISOString().replace(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{3})Z$/,
+    '$1$2$3-$4$5$6$7',
+  );
+  return `${configPath}.bak-${stamp}`;
+}
+
+export function installPreset({ configPath, items, now = new Date(), fsModule = fs }) {
+  const exists = fsModule.existsSync(configPath);
+  const original = exists ? fsModule.readFileSync(configPath, 'utf8') : '';
+  const updated = updateConfigText(original, items);
+  if (!updated.changed) return { changed: false, configPath, backupPath: null };
+
+  fsModule.mkdirSync(dirname(configPath), { recursive: true });
+  const backupPath = exists ? formatBackupPath(configPath, now) : null;
+  if (backupPath) fsModule.copyFileSync(configPath, backupPath);
+  fsModule.writeFileSync(configPath, updated.text);
+  return { changed: true, configPath, backupPath };
+}
+
+export function validateWithCodex(
+  items,
+  command = process.env.CODEX_BIN || 'codex',
+  spawn = spawnSync,
+) {
+  const result = spawn(command, [
+    '--strict-config',
+    '-c',
+    `tui.status_line=${JSON.stringify(items)}`,
+    '--help',
+  ], {
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+    windowsHide: true,
+  });
+  if (result.error) throw new Error(`Codex could not be executed: ${result.error.message}`);
+  if (result.status !== 0) {
+    const detail = String(result.stderr || result.stdout || '').trim();
+    throw new Error(`Codex rejected the statusline${detail ? `: ${detail}` : ''}`);
+  }
+  return true;
+}
+
+function usage() {
+  return [
+    'Usage: node codex-statusline.mjs [--print|--check|--install] [--preset full|compact]',
+    '',
+    '  --print    Print the native [tui] status_line TOML fragment (default).',
+    '  --check    Validate the preset with the installed Codex CLI.',
+    '  --install  Update CODEX_HOME/config.toml after creating a backup.',
+    '  --preset   Select full (default) or compact.',
+  ].join('\n');
+}
+
+function main(argv = process.argv.slice(2)) {
+  const { action, preset } = parseArgs(argv);
+  const items = presetItems(preset);
+  if (action === 'help') {
+    console.log(usage());
+    return;
+  }
+  if (action === 'print') {
+    process.stdout.write(renderToml(items));
+    return;
+  }
+  if (action === 'check') {
+    validateWithCodex(items);
+    console.log(`Codex statusline preset '${preset}' is accepted.`);
+    return;
+  }
+  const configPath = resolveCodexConfigPath();
+  const result = installPreset({ configPath, items });
+  if (!result.changed) {
+    console.log(`Codex statusline preset '${preset}' is already installed at ${configPath}.`);
+    return;
+  }
+  console.log(`Installed Codex statusline preset '${preset}' at ${configPath}.`);
+  if (result.backupPath) console.log(`Backup: ${result.backupPath}`);
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`hud codex: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  }
 }

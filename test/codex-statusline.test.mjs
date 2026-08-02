@@ -1,10 +1,18 @@
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PRESETS,
   STATUS_LINE_ITEMS,
+  formatBackupPath,
+  installPreset,
+  parseArgs,
   presetItems,
   renderToml,
+  resolveCodexConfigPath,
   updateConfigText,
 } from '../codex-statusline.mjs';
 
@@ -60,4 +68,56 @@ test('updateConfigText preserves CRLF line endings', () => {
   const result = updateConfigText('[tui]\r\nnotifications = true\r\n', PRESETS.compact);
   assert.match(result.text, /\r\nstatus_line =/);
   assert.doesNotMatch(result.text, /(?<!\r)\n/);
+});
+
+test('parseArgs defaults to full preset printing', () => {
+  assert.deepEqual(parseArgs([]), { action: 'print', preset: 'full' });
+  assert.deepEqual(parseArgs(['--install', '--preset', 'compact']), {
+    action: 'install', preset: 'compact',
+  });
+});
+
+test('parseArgs rejects conflicting actions and unknown flags', () => {
+  assert.throws(() => parseArgs(['--print', '--install']), /one action/i);
+  assert.throws(() => parseArgs(['--wat']), /unknown option/i);
+});
+
+test('resolveCodexConfigPath honors CODEX_HOME', () => {
+  assert.equal(
+    resolveCodexConfigPath({ CODEX_HOME: 'C:/codex-home' }, 'C:/ignored'),
+    join('C:/codex-home', 'config.toml'),
+  );
+});
+
+test('installPreset preserves unrelated config and creates one backup', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hud-codex-'));
+  const configPath = join(root, 'config.toml');
+  const original = '# keep this\nmodel = "gpt-5"\n\n[tui]\nnotifications = true\n\n[features]\nfast = true\n';
+  writeFileSync(configPath, original);
+  const now = new Date('2026-08-02T12:34:56.789Z');
+  const result = installPreset({ configPath, items: PRESETS.compact, now });
+  assert.equal(result.changed, true);
+  assert.equal(readFileSync(configPath, 'utf8').includes('notifications = true'), true);
+  assert.equal(readFileSync(configPath, 'utf8').includes('[features]'), true);
+  assert.match(result.backupPath, /config\.toml\.bak-20260802-123456789$/);
+  assert.equal(readFileSync(result.backupPath, 'utf8'), original);
+});
+
+test('installPreset does not rewrite an unchanged config', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hud-codex-'));
+  const configPath = join(root, 'config.toml');
+  const expected = renderToml(PRESETS.compact);
+  writeFileSync(configPath, expected);
+  const result = installPreset({ configPath, items: PRESETS.compact, now: new Date() });
+  assert.deepEqual(result, { changed: false, configPath, backupPath: null });
+});
+
+test('CLI --print outputs the requested fragment without creating files', () => {
+  const cli = join(process.cwd(), 'codex-statusline.mjs');
+  const result = spawnSync(process.execPath, [cli, '--print', '--preset', 'compact'], {
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\[tui\]/);
+  assert.match(result.stdout, /"context-remaining"/);
 });
