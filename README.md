@@ -36,7 +36,7 @@ Codex owns its TUI footer and does not execute `hud.mjs` as an external
 statusline command. The focused native preset keeps only this order:
 
 ```text
-weekly → context used → total input → total output
+model → weekly → context used → total input → total output
 ```
 
 Install it globally with a recoverable backup:
@@ -54,9 +54,10 @@ node codex-hud.mjs --once --cwd (Get-Location)
 node codex-hud.mjs --watch --cwd (Get-Location)
 ```
 
-It renders only `weekly`, `context used`, and `28.8K in · 230 out`; bars exist
-only on the first two groups. The companion reads Codex rollout metadata and
-token-count events only. It never reads credentials or prompt/response text.
+It renders only `model`, `weekly`, `context used`, and `28.8K in · 230 out`; the
+model is text-only and bars exist only on the first two groups. The companion
+reads Codex rollout metadata, the active model, and token-count events only. It
+never reads credentials or prompt/response text.
 The existing `full` and `compact` native presets remain available. See
 [docs/codex-statusline.md](docs/codex-statusline.md) for the native/companion
 boundary, animation behavior, backup flow, and version notes.

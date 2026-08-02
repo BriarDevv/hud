@@ -42,6 +42,14 @@ function weeklyLimit(rateLimits) {
   return clampPercent(selected?.used_percent);
 }
 
+export function parseTurnContextEvent(event) {
+  const isTurnContext = event?.type === 'turn_context';
+  const isEventMessage = event?.type === 'event_msg' && event.payload?.type === 'turn_context';
+  if (!isTurnContext && !isEventMessage) return null;
+  const model = event.payload?.model;
+  return typeof model === 'string' && model.trim() ? model.trim() : null;
+}
+
 export function parseTokenCountEvent(event) {
   if (event?.type !== 'event_msg' || event.payload?.type !== 'token_count') return null;
 
@@ -115,10 +123,11 @@ function formatPercent(value) {
 export function renderLine(snapshot = {}, options = {}) {
   const phase = finiteNumber(options.phase) ?? 0;
   const barOptions = { ...options, phase };
+  const model = typeof snapshot.model === 'string' && snapshot.model.trim() ? snapshot.model.trim() : '--';
   const weekly = `weekly`.padEnd(LABEL_WIDTH) + ` ${renderBar(snapshot.weeklyPercent, barOptions)} ${formatPercent(snapshot.weeklyPercent)}`;
   const context = `context used`.padEnd(LABEL_WIDTH) + ` ${renderBar(snapshot.contextPercent, barOptions)} ${formatPercent(snapshot.contextPercent)}`;
   const totals = `${formatTokenCount(snapshot.inputTokens)} in · ${formatTokenCount(snapshot.outputTokens)} out`;
-  return [weekly, context, totals].join(SEPARATOR);
+  return [`model ${model}`, weekly, context, totals].join(SEPARATOR);
 }
 
 export function resolveCodexHome(env = process.env, home = homedir()) {
@@ -214,13 +223,18 @@ export function findLatestSession({ codexHome, cwd = process.cwd(), sessionId = 
 export function readSessionSnapshot(filePath, fsModule = fs) {
   const text = readTail(filePath, fsModule);
   let latest = null;
+  let model = null;
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     try {
-      const snapshot = parseTokenCountEvent(JSON.parse(line));
-      if (snapshot) latest = snapshot;
+      const event = JSON.parse(line);
+      const nextModel = parseTurnContextEvent(event);
+      if (nextModel) model = nextModel;
+      const snapshot = parseTokenCountEvent(event);
+      if (snapshot) latest = { ...snapshot, model };
     } catch { /* ignore a partial line written concurrently by Codex */ }
   }
+  if (latest && model) latest.model = model;
   return latest;
 }
 

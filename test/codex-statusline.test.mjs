@@ -138,7 +138,8 @@ test('project-local Codex config stays aligned with the hud preset', () => {
 
 test('hud preset keeps only the requested Codex groups in order', () => {
   assert.deepEqual(presetItems('hud'), [
-    'weekly-limit', 'context-used', 'total-input-tokens', 'total-output-tokens',
+    'model-with-reasoning', 'weekly-limit', 'context-used',
+    'total-input-tokens', 'total-output-tokens',
   ]);
   assert.equal(new Set(PRESETS.hud).size, PRESETS.hud.length);
 });

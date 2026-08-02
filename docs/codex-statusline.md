@@ -27,7 +27,7 @@ The focused native preset is exactly:
 
 ```toml
 [tui]
-status_line = ["weekly-limit", "context-used", "total-input-tokens", "total-output-tokens"]
+status_line = ["model-with-reasoning", "weekly-limit", "context-used", "total-input-tokens", "total-output-tokens"]
 ```
 
 Codex supplies the values and native labels. Its supported config surface does
@@ -51,18 +51,19 @@ node codex-hud.mjs --once --cwd (Get-Location)
 The line is deliberately fixed and sparse:
 
 ```text
-weekly       [███████████░] 95%  │  context used [█░░░░░░░░░░░] 11%  │  28.8K in · 230 out
+model gpt-5.6-luna  │  weekly       [███████████░] 95%  │  context used [█░░░░░░░░░░░] 11%  │  28.8K in · 230 out
 ```
 
-Only `weekly` and `context used` have bars. The bars are 12 cells wide and
-filled cells cycle through a restrained neon aurora of violet, cyan, mint,
-lime, amber, and magenta every 120 ms. The data snapshot refreshes once per
-second, so the gradient remains alive when the values are idle. Set `NO_COLOR`
-or pipe `--once` to receive plain Unicode output.
+The model is text-only. Only `weekly` and `context used` have bars. The bars
+are 12 cells wide and filled cells cycle through a restrained neon aurora of
+violet, cyan, mint, lime, amber, and magenta every 120 ms. The data snapshot
+refreshes once per second, so the gradient remains alive when the values are
+idle. Set `NO_COLOR` or pipe `--once` to receive plain Unicode output.
 
 The companion reads only:
 
 - the newest matching `session_meta` working directory;
+- the latest `turn_context` model;
 - the latest `event_msg` with `payload.type == "token_count"`;
 - weekly usage from the 10,080-minute rate-limit window;
 - model context capacity and total input/output token counts.
@@ -85,7 +86,7 @@ native information:
 - `full`: every useful item exposed by the installed Codex CLI;
 - `compact`: model/reasoning, remaining context, both limits, Git branch, and
   run state;
-- `hud`: the four-item focused footer described above.
+- `hud`: the five-item focused footer described above.
 
 Examples:
 

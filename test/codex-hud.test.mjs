@@ -8,6 +8,7 @@ import {
   formatTokenCount,
   findLatestSession,
   parseArgs,
+  parseTurnContextEvent,
   parseTokenCountEvent,
   readSessionSnapshot,
   renderBar,
@@ -44,6 +45,21 @@ test('extracts weekly, context, and total token values from a token event', () =
   });
 });
 
+test('extracts the model only from a turn context event', () => {
+  assert.equal(parseTurnContextEvent({
+    type: 'turn_context',
+    payload: { model: 'gpt-5.6-luna' },
+  }), 'gpt-5.6-luna');
+  assert.equal(parseTurnContextEvent({
+    type: 'event_msg',
+    payload: { type: 'turn_context', model: 'gpt-5.6-luna' },
+  }), 'gpt-5.6-luna');
+  assert.equal(parseTurnContextEvent({
+    type: 'event_msg',
+    payload: { type: 'agent_message', model: 'should-not-be-used' },
+  }), null);
+});
+
 test('formats token counts compactly without losing small integers', () => {
   assert.equal(formatTokenCount(28777), '28.8K');
   assert.equal(formatTokenCount(230), '230');
@@ -60,20 +76,27 @@ test('renders a fixed-width bar with only the filled cells colored', () => {
 
 test('renders only weekly, context used, and input/output in order', () => {
   const line = renderLine({
+    model: 'gpt-5.6-luna',
     weeklyPercent: 95,
     contextPercent: 11,
     inputTokens: 28777,
     outputTokens: 230,
   }, { color: false, phase: 0 });
-  assert.equal(line, 'weekly       [███████████░] 95%  │  context used [█░░░░░░░░░░░] 11%  │  28.8K in · 230 out');
+  assert.equal(line, 'model gpt-5.6-luna  │  weekly       [███████████░] 95%  │  context used [█░░░░░░░░░░░] 11%  │  28.8K in · 230 out');
+  assert.ok(line.indexOf('model gpt-5.6-luna') < line.indexOf('weekly'));
   assert.ok(line.indexOf('weekly') < line.indexOf('context used'));
   assert.ok(line.indexOf('context used') < line.indexOf('28.8K in'));
-  assert.doesNotMatch(line, /model|ready|fast|uuid|version|session|remaining/i);
+  assert.doesNotMatch(line, /ready|fast|uuid|version|session|remaining/i);
+});
+
+test('renders a stable model placeholder when model data is missing', () => {
+  assert.match(renderLine({ weeklyPercent: 0, contextPercent: 0, inputTokens: 0, outputTokens: 0 }, { color: false }), /^model --  │  weekly/);
 });
 
 function sessionFixture({ cwd, inputTokens, outputTokens, weeklyPercent = 42 }) {
   return [
     JSON.stringify({ type: 'session_meta', payload: { cwd } }),
+    JSON.stringify({ type: 'turn_context', payload: { model: 'gpt-5.6-luna' } }),
     JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message', message: 'ignored' } }),
     JSON.stringify({
       type: 'event_msg',
@@ -114,6 +137,7 @@ test('reads the latest complete token event and ignores a partial trailing line'
   const path = join(root, 'rollout.jsonl');
   writeFileSync(path, sessionFixture({ cwd: 'C:/project', inputTokens: 28777, outputTokens: 230, weeklyPercent: 95 }));
   assert.deepEqual(readSessionSnapshot(path), {
+    model: 'gpt-5.6-luna',
     weeklyPercent: 95,
     contextPercent: 11,
     inputTokens: 28777,

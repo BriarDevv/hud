@@ -44,10 +44,11 @@ the OMC HUD.
 
 Codex CLI owns its TUI footer instead of invoking an external statusline
 command. The native focused preset therefore uses only
-`weekly-limit`, `context-used`, `total-input-tokens`, and
-`total-output-tokens`, in that order. The companion `codex-hud.mjs` reads
-sanitized token-count events from rollout files to provide the exact aligned
-rainbow line in a separate PowerShell/terminal pane.
+`model-with-reasoning`, `weekly-limit`, `context-used`,
+`total-input-tokens`, and `total-output-tokens`, in that order. The companion
+`codex-hud.mjs` reads the active model and sanitized token-count events from
+rollout files to provide the exact aligned rainbow line in a separate
+PowerShell/terminal pane.
 
 - `node codex-statusline.mjs --check --preset hud` validates the installed
   Codex parser without writing configuration.

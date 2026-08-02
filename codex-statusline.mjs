@@ -26,7 +26,8 @@ export const PRESETS = Object.freeze({
     'weekly-limit', 'git-branch', 'run-state',
   ]),
   hud: Object.freeze([
-    'weekly-limit', 'context-used', 'total-input-tokens', 'total-output-tokens',
+    'model-with-reasoning', 'weekly-limit', 'context-used',
+    'total-input-tokens', 'total-output-tokens',
   ]),
 });
 

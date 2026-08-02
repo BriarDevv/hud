@@ -6,13 +6,13 @@
 ## Goal
 
 Make the Codex footer calm, compact, and visually alive by keeping only the
-three requested information groups in this order:
+requested information groups in this order:
 
 ```text
-weekly      [████████░░░░] 95%  │  context used [█░░░░░░░░░░░] 11%  │  28.8K in · 230 out
+model gpt-5.6-luna  │  weekly      [████████░░░░] 95%  │  context used [█░░░░░░░░░░░] 11%  │  28.8K in · 230 out
 ```
 
-The native Codex footer will contain the same four supported data items. A
+The native Codex footer will contain the same five supported data items. A
 zero-dependency companion renderer will provide the exact aligned layout and
 animated color when run in a separate terminal pane or PowerShell surface.
 
@@ -48,9 +48,9 @@ Empty cells use dim neutral ink and unknown values use dim dots. The renderer
 falls back to plain characters when `NO_COLOR` is set or stdout is not a TTY.
 
 The two bars have a fixed 12-cell width and each value remains aligned. The
-third group is plain text with no bar, exactly as requested. The line has no
-model, run state, fast-mode label, IDs, version, reset timers, or extra
-decorative metrics.
+model and final token group are plain text with no bar, exactly as requested.
+The line has no run state, fast-mode label, IDs, version, reset timers, or
+extra decorative metrics.
 
 ## Data model
 
@@ -61,6 +61,8 @@ The latest `event_msg` with `payload.type === "token_count"` supplies:
 - `payload.info.model_context_window` as the context capacity.
 - `payload.info.total_token_usage.input_tokens` and
   `payload.info.total_token_usage.output_tokens` for the final group.
+
+The latest `turn_context.payload.model` supplies the first text-only group.
 
 Context used is `input_tokens / model_context_window * 100`, clamped to
 0–100. Token counts use compact decimal notation (`28.8K`, `1.2M`) while
@@ -74,6 +76,7 @@ than inventing zeroes.
 Add a `hud` preset to `codex-statusline.mjs`:
 
 ```text
+model-with-reasoning
 weekly-limit
 context-used
 total-input-tokens
@@ -118,9 +121,9 @@ Use Node's built-in test runner with fixture rollout files. Cover:
 
 ## Acceptance criteria
 
-- The active native global footer contains only weekly, context used, input,
-  and output in that order.
-- The companion output contains only the three requested groups in that order.
+- The active native global footer contains only model, weekly, context used,
+  input, and output in that order.
+- The companion output contains only the four requested groups in that order.
 - Only weekly and context used have bars.
 - Bars retain fixed alignment and animate continuously while idle.
 - The renderer is zero-dependency, cross-platform Node.js, and safe around
