@@ -122,7 +122,19 @@ test('CLI --print outputs the requested fragment without creating files', () => 
   assert.match(result.stdout, /"context-remaining"/);
 });
 
-test('project-local Codex config stays aligned with the full preset', () => {
+test('project-local Codex config stays aligned with the hud preset', () => {
   const projectConfig = readFileSync(join(process.cwd(), '.codex', 'config.toml'), 'utf8');
-  assert.equal(projectConfig, renderToml(PRESETS.full));
+  assert.equal(projectConfig, renderToml(PRESETS.hud));
+});
+
+test('hud preset keeps only the requested Codex groups in order', () => {
+  assert.deepEqual(presetItems('hud'), [
+    'weekly-limit', 'context-used', 'total-input-tokens', 'total-output-tokens',
+  ]);
+  assert.equal(new Set(PRESETS.hud).size, PRESETS.hud.length);
+});
+
+test('project-local Codex config repeats the hud contract', () => {
+  const projectConfig = readFileSync(join(process.cwd(), '.codex', 'config.toml'), 'utf8');
+  assert.equal(projectConfig, renderToml(PRESETS.hud));
 });

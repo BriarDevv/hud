@@ -25,6 +25,9 @@ export const PRESETS = Object.freeze({
     'model-with-reasoning', 'context-remaining', 'five-hour-limit',
     'weekly-limit', 'git-branch', 'run-state',
   ]),
+  hud: Object.freeze([
+    'weekly-limit', 'context-used', 'total-input-tokens', 'total-output-tokens',
+  ]),
 });
 
 export function presetItems(name = 'full') {
@@ -170,12 +173,12 @@ export function validateWithCodex(
 
 function usage() {
   return [
-    'Usage: node codex-statusline.mjs [--print|--check|--install] [--preset full|compact]',
+    'Usage: node codex-statusline.mjs [--print|--check|--install] [--preset full|compact|hud]',
     '',
     '  --print    Print the native [tui] status_line TOML fragment (default).',
     '  --check    Validate the preset with the installed Codex CLI.',
     '  --install  Update CODEX_HOME/config.toml after creating a backup.',
-    '  --preset   Select full (default) or compact.',
+    '  --preset   Select full (default), compact, or hud.',
   ].join('\n');
 }
 

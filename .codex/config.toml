@@ -1,2 +1,2 @@
 [tui]
-status_line = ["model-with-reasoning", "context-used", "context-remaining", "five-hour-limit", "weekly-limit", "used-tokens", "total-input-tokens", "total-output-tokens", "git-branch", "current-dir", "project-name", "run-state", "task-progress", "fast-mode", "thread-id", "thread-title", "codex-version", "actions"]
+status_line = ["weekly-limit", "context-used", "total-input-tokens", "total-output-tokens"]
