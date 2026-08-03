@@ -8,6 +8,8 @@
 
 ## How verified
 
-- [ ] `node hud.mjs < test/sample-stdin.json` renders correctly
-- [ ] `echo {} | node hud.mjs` degrades gracefully
+- [ ] `node --test` passes
+- [ ] `node src/claude/statusline.mjs < test/fixtures/claude-stdin.json` renders correctly
+- [ ] `echo {} | node src/claude/statusline.mjs` degrades gracefully
 - [ ] Still zero-dependency, single output line, never throws
+- [ ] No new files in the repo root; branch is rebased on `main`
