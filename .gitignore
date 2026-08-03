@@ -2,3 +2,8 @@
 .codex/
 .omc/
 .worktrees/
+node_modules/
+
+# With zero dependencies the lockfile carries no information; CI enforces
+# that package.json never declares any.
+package-lock.json

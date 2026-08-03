@@ -57,7 +57,7 @@ jobs:
           allowed=$(printf '%s\n' \
             .claude .git .github .gitattributes .gitignore \
             AGENTS.md CLAUDE.md CODE_OF_CONDUCT.md CONTRIBUTING.md \
-            LICENSE README.md SECURITY.md \
+            LICENSE README.md SECURITY.md package.json \
             docs src test | sort)
           actual=$(ls -A | sort)
           stray=$(comm -13 <(echo "$allowed") <(echo "$actual"))
@@ -79,3 +79,19 @@ jobs:
             exit 1
           fi
           echo "No local tool config tracked."
+
+      # The zero-dependency rule is the whole premise of these scripts: they
+      # run straight from a git clone with nothing installed.
+      - name: Dependencies stay at zero
+        shell: bash
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const fields = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+            const declared = fields.filter((f) => pkg[f] && Object.keys(pkg[f]).length > 0);
+            if (declared.length > 0) {
+              console.error('::error::package.json must declare no dependencies, found: ' + declared.join(', '));
+              process.exit(1);
+            }
+            console.log('Zero dependencies confirmed.');
+          "
