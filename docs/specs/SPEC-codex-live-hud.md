@@ -3,6 +3,12 @@
 **Date:** 2026-08-02  
 **Status:** Approved direction; implementation in progress
 
+> Correction note (2026-08-02): the native/companion boundary below is
+> normative, but the companion is optional and never becomes part of Codex's
+> global TUI. Codex 0.146 has no external command, arbitrary ANSI, or animated
+> custom-footer hook. Use the native preset for the global integration and run
+> `src/codex/hud.mjs` separately only when a second pane is acceptable.
+
 ## Goal
 
 Make the Codex footer calm, compact, and visually alive by keeping only the
@@ -83,9 +89,10 @@ total-input-tokens
 total-output-tokens
 ```
 
-The project-local config and the explicit global install use this preset. The
-existing `full` and `compact` presets remain available for contributors who
-want them.
+The explicit global install uses this preset. The repository does not commit a
+project-local Codex config because Codex reads `CODEX_HOME/config.toml` only.
+The existing `full` and `compact` presets remain available for contributors
+who want them.
 
 ### Companion renderer
 
@@ -117,7 +124,7 @@ Use Node's built-in test runner with fixture rollout files. Cover:
 4. Fixed-width, ordered output with bars only in the first two groups.
 5. Rainbow rendering with ANSI disabled/enabled and deterministic phase.
 6. CLI parsing for `--once`, `--watch`, `--cwd`, and `--session`.
-7. The native `hud` preset and project-local config alignment.
+7. The native `hud` preset and global install alignment.
 
 ## Acceptance criteria
 

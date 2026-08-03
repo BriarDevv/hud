@@ -59,22 +59,25 @@ Codex CLI owns its TUI footer instead of invoking an external statusline
 command. The native focused preset therefore uses only
 `model-with-reasoning`, `weekly-limit`, `context-used`,
 `total-input-tokens`, and `total-output-tokens`, in that order. The companion
-`src/codex/hud.mjs` reads the active model and sanitized token-count events
-from rollout files to provide the exact aligned rainbow line in a separate
-PowerShell/terminal pane.
+`src/codex/hud.mjs` is not part of that footer: it reads the active model and
+sanitized token-count events from rollout files to provide the exact aligned
+rainbow line only when explicitly run in a separate PowerShell/terminal pane.
 
-- Codex reads only `CODEX_HOME/config.toml` (default `~/.codex/config.toml`).
-  A repo-local `.codex/` is never read by Codex — it is gitignored, not
-  committed.
-- `node src/codex/statusline.mjs --check --preset hud` validates the
-  installed Codex parser without writing configuration.
+The native installer sets `tui.status_line_use_colors = true` and
+`tui.animations = true`, which enable Codex's theme colors and its own TUI
+animations. Codex still controls the native labels, separators, and rendering;
+there is no supported external command or arbitrary ANSI hook. Restart Codex
+after installing because it loads this configuration at process startup.
+
+- `node src/codex/statusline.mjs --check --preset hud` validates the installed
+  Codex parser and the native visual settings without writing configuration.
 - `node src/codex/statusline.mjs --install --preset hud` updates
   `CODEX_HOME/config.toml` only after an explicit request and creates a
   timestamped backup before changing an existing file.
 - `node src/codex/hud.mjs --once --cwd .` renders one deterministic line.
 - `node src/codex/hud.mjs --watch --cwd .` animates the gradient until Ctrl+C.
-- The companion never reads auth files, prompt text, response text, or
-  provider credentials.
+- The companion is opt-in and never reads auth files, prompt text, response
+  text, or provider credentials.
 - `full` and `compact` remain available for contributors who need more native
   Codex fields.
 

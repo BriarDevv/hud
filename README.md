@@ -40,8 +40,9 @@ Always one line (see `COLUMNS`/`LINES` in [Test](#test)).
 
 ## Codex CLI
 
-Codex owns its TUI footer and does not execute `hud.mjs` as an external
-statusline command. The focused native preset keeps only this order:
+Codex owns its TUI footer and does not execute `hud.mjs` or this repository's
+renderer as a statusline command. The focused native preset keeps only this
+order:
 
 ```text
 model → weekly → context used → total input → total output
@@ -54,8 +55,13 @@ node src/codex/statusline.mjs --check --preset hud
 node src/codex/statusline.mjs --install --preset hud
 ```
 
-For the exact aligned layout and living neon gradient, open a split terminal
-pane and run the companion there:
+The native footer uses Codex's own labels and separators. Theme colors are
+enabled explicitly, and `animations = true` enables Codex's own TUI motion; it
+does not make the footer a custom ANSI or rainbow renderer. Restart an already
+open Codex process after installing because it reads `config.toml` at startup.
+
+The exact aligned layout and living neon gradient are available only as an
+optional standalone renderer in another terminal pane:
 
 ```powershell
 node src/codex/hud.mjs --once --cwd (Get-Location)

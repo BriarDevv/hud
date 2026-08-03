@@ -12,11 +12,13 @@ import { fileURLToPath } from 'node:url';
  */
 
 export const STATUS_LINE_ITEMS = Object.freeze([
-  'model-with-reasoning', 'context-used', 'context-remaining',
-  'five-hour-limit', 'weekly-limit', 'used-tokens',
-  'total-input-tokens', 'total-output-tokens', 'git-branch',
-  'current-dir', 'project-name', 'run-state', 'task-progress',
-  'fast-mode', 'thread-id', 'thread-title', 'codex-version', 'actions',
+  'model', 'model-with-reasoning', 'reasoning', 'current-dir',
+  'project-name', 'git-branch', 'pull-request-number', 'branch-changes',
+  'run-state', 'permissions', 'approval-mode', 'context-remaining',
+  'context-used', 'five-hour-limit', 'weekly-limit', 'codex-version',
+  'context-window-size', 'used-tokens', 'total-input-tokens',
+  'total-output-tokens', 'thread-id', 'fast-mode', 'raw-output',
+  'thread-title', 'workspace-headline', 'task-progress',
 ]);
 
 export const PRESETS = Object.freeze({
@@ -44,14 +46,37 @@ function renderStatusLineArray(items) {
   return `[${items.map((item) => JSON.stringify(item)).join(', ')}]`;
 }
 
-export function renderToml(items) {
-  return `[tui]\nstatus_line = ${renderStatusLineArray(items)}\n`;
+function normalizeVisualOptions(options = {}) {
+  const normalized = {
+    statusLineUseColors: options.statusLineUseColors ?? true,
+    animations: options.animations ?? true,
+  };
+  if (typeof normalized.statusLineUseColors !== 'boolean') {
+    throw new TypeError('statusLineUseColors must be a boolean');
+  }
+  if (typeof normalized.animations !== 'boolean') {
+    throw new TypeError('animations must be a boolean');
+  }
+  return normalized;
+}
+
+export function renderToml(items, options = {}) {
+  const { statusLineUseColors, animations } = normalizeVisualOptions(options);
+  return [
+    '[tui]',
+    `status_line = ${renderStatusLineArray(items)}`,
+    `status_line_use_colors = ${statusLineUseColors}`,
+    `animations = ${animations}`,
+    '',
+  ].join('\n');
 }
 
 const TUI_HEADER = /^\s*\[tui\]\s*(?:#.*)?$/;
 const ARRAY_TUI_HEADER = /^\s*\[\[tui\]\]\s*(?:#.*)?$/;
 const ANY_TABLE_HEADER = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
 const STATUS_LINE_KEY = /^(\s*)status_line\s*=/;
+const STATUS_LINE_USE_COLORS_KEY = /^(\s*)status_line_use_colors\s*=/;
+const ANIMATIONS_KEY = /^(\s*)animations\s*=/;
 
 function splitLines(text) {
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
@@ -65,34 +90,93 @@ function joinLines(lines, eol, trailingEol) {
   return lines.join(eol) + (trailingEol ? eol : '');
 }
 
-export function updateConfigText(text, items) {
+function findAssignmentEnd(lines, start, sectionEnd, isArray) {
+  if (!isArray) return start;
+
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  for (let index = start; index < sectionEnd; index += 1) {
+    const line = lines[index];
+    for (let offset = 0; offset < line.length; offset += 1) {
+      const character = line[offset];
+      if (quote) {
+        if (quote === '"' && escaped) {
+          escaped = false;
+        } else if (quote === '"' && character === '\\') {
+          escaped = true;
+        } else if (character === quote) {
+          quote = null;
+        }
+        continue;
+      }
+      if (character === '#') break;
+      if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === '[') {
+        depth += 1;
+      } else if (character === ']') {
+        depth -= 1;
+        if (depth === 0) return index;
+      }
+    }
+  }
+  throw new Error('Unterminated status_line array in [tui]');
+}
+
+function findAssignmentRanges(lines, start, sectionEnd, key, isArray) {
+  const ranges = [];
+  for (let index = start; index < sectionEnd; index += 1) {
+    if (!key.test(lines[index])) continue;
+    const end = findAssignmentEnd(lines, index, sectionEnd, isArray);
+    ranges.push({ start: index, end });
+    index = end;
+  }
+  return ranges;
+}
+
+function sectionInsertionIndex(lines, start, sectionEnd) {
+  let index = sectionEnd;
+  while (index > start && lines[index - 1].trim() === '') index -= 1;
+  return index;
+}
+
+export function updateConfigText(text, items, options = {}) {
   if (typeof text !== 'string') throw new TypeError('Configuration text must be a string');
-  const assignment = `status_line = ${renderStatusLineArray(items)}`;
+  const { statusLineUseColors, animations } = normalizeVisualOptions(options);
+  const assignments = [
+    ['status_line', STATUS_LINE_KEY, `status_line = ${renderStatusLineArray(items)}`, true],
+    ['status_line_use_colors', STATUS_LINE_USE_COLORS_KEY, `status_line_use_colors = ${statusLineUseColors}`, false],
+    ['animations', ANIMATIONS_KEY, `animations = ${animations}`, false],
+  ];
   const { eol, lines, trailingEol } = splitLines(text);
   const arrayTuiIndex = lines.findIndex((line) => ARRAY_TUI_HEADER.test(line));
   if (arrayTuiIndex >= 0) throw new Error('Unsupported [[tui]] array table');
 
   const tuiIndex = lines.findIndex((line) => TUI_HEADER.test(line));
   if (tuiIndex < 0) {
-    const nextLines = lines.length > 0 ? [...lines, '', '[tui]', assignment] : ['[tui]', assignment];
-    return { text: joinLines(nextLines, eol, trailingEol || lines.length === 0), changed: true };
+    const hasContent = lines.some((line) => line.trim() !== '');
+    const nextLines = hasContent
+      ? [...lines, '', '[tui]', ...assignments.map(([, , value]) => value)]
+      : ['[tui]', ...assignments.map(([, , value]) => value)];
+    return { text: joinLines(nextLines, eol, trailingEol || !hasContent), changed: true };
   }
 
   const nextHeaderOffset = lines.slice(tuiIndex + 1).findIndex((line) => ANY_TABLE_HEADER.test(line));
-  const sectionEnd = nextHeaderOffset < 0 ? lines.length : tuiIndex + 1 + nextHeaderOffset;
-  const statusIndices = [];
-  for (let index = tuiIndex + 1; index < sectionEnd; index += 1) {
-    if (STATUS_LINE_KEY.test(lines[index])) statusIndices.push(index);
-  }
-  if (statusIndices.length > 1) throw new Error('Multiple status_line keys in [tui]');
-
+  let sectionEnd = nextHeaderOffset < 0 ? lines.length : tuiIndex + 1 + nextHeaderOffset;
   const nextLines = [...lines];
-  if (statusIndices.length === 1) {
-    const index = statusIndices[0];
-    const indent = lines[index].match(/^\s*/)[0];
-    nextLines[index] = `${indent}${assignment}`;
-  } else {
-    nextLines.splice(sectionEnd, 0, assignment);
+  for (const [name, key, value, isArray] of assignments) {
+    const ranges = findAssignmentRanges(nextLines, tuiIndex + 1, sectionEnd, key, isArray);
+    if (ranges.length > 1) throw new Error(`Multiple ${name} keys in [tui]`);
+    if (ranges.length === 1) {
+      const { start, end } = ranges[0];
+      const indent = nextLines[start].match(/^\s*/)[0];
+      nextLines.splice(start, end - start + 1, `${indent}${value}`);
+      sectionEnd += start === end ? 0 : start - end;
+    } else {
+      nextLines.splice(sectionInsertionIndex(nextLines, tuiIndex + 1, sectionEnd), 0, value);
+      sectionEnd += 1;
+    }
   }
 
   const nextText = joinLines(nextLines, eol, trailingEol);
@@ -136,6 +220,17 @@ export function formatBackupPath(configPath, now = new Date()) {
   return `${configPath}.bak-${stamp}`;
 }
 
+function uniqueBackupPath(configPath, now, fsModule) {
+  const basePath = formatBackupPath(configPath, now);
+  let backupPath = basePath;
+  let suffix = 1;
+  while (fsModule.existsSync(backupPath)) {
+    backupPath = `${basePath}-${suffix}`;
+    suffix += 1;
+  }
+  return backupPath;
+}
+
 export function installPreset({ configPath, items, now = new Date(), fsModule = fs }) {
   const exists = fsModule.existsSync(configPath);
   const original = exists ? fsModule.readFileSync(configPath, 'utf8') : '';
@@ -143,7 +238,7 @@ export function installPreset({ configPath, items, now = new Date(), fsModule = 
   if (!updated.changed) return { changed: false, configPath, backupPath: null };
 
   fsModule.mkdirSync(dirname(configPath), { recursive: true });
-  const backupPath = exists ? formatBackupPath(configPath, now) : null;
+  const backupPath = exists ? uniqueBackupPath(configPath, now, fsModule) : null;
   if (backupPath) fsModule.copyFileSync(configPath, backupPath);
   fsModule.writeFileSync(configPath, updated.text);
   return { changed: true, configPath, backupPath };
@@ -158,6 +253,10 @@ export function validateWithCodex(
     '--strict-config',
     '-c',
     `tui.status_line=${JSON.stringify(items)}`,
+    '-c',
+    'tui.status_line_use_colors=true',
+    '-c',
+    'tui.animations=true',
     '--help',
   ], {
     encoding: 'utf8',
