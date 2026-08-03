@@ -1,2 +1,0 @@
-[tui]
-status_line = ["model-with-reasoning", "weekly-limit", "context-used", "total-input-tokens", "total-output-tokens"]

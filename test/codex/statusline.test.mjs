@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -14,7 +15,9 @@ import {
   renderToml,
   resolveCodexConfigPath,
   updateConfigText,
-} from '../codex-statusline.mjs';
+} from '../../src/codex/statusline.mjs';
+
+const CLI = fileURLToPath(new URL('../../src/codex/statusline.mjs', import.meta.url));
 
 const FULL = [
   'model-with-reasoning', 'context-used', 'context-remaining',
@@ -113,8 +116,7 @@ test('installPreset does not rewrite an unchanged config', () => {
 });
 
 test('CLI --print outputs the requested fragment without creating files', () => {
-  const cli = join(process.cwd(), 'codex-statusline.mjs');
-  const result = spawnSync(process.execPath, [cli, '--print', '--preset', 'compact'], {
+  const result = spawnSync(process.execPath, [CLI, '--print', '--preset', 'compact'], {
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
@@ -123,17 +125,11 @@ test('CLI --print outputs the requested fragment without creating files', () => 
 });
 
 test('CLI --print outputs the focused hud fragment', () => {
-  const cli = join(process.cwd(), 'codex-statusline.mjs');
-  const result = spawnSync(process.execPath, [cli, '--print', '--preset', 'hud'], {
+  const result = spawnSync(process.execPath, [CLI, '--print', '--preset', 'hud'], {
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, renderToml(PRESETS.hud));
-});
-
-test('project-local Codex config stays aligned with the hud preset', () => {
-  const projectConfig = readFileSync(join(process.cwd(), '.codex', 'config.toml'), 'utf8');
-  assert.equal(projectConfig, renderToml(PRESETS.hud));
 });
 
 test('hud preset keeps only the requested Codex groups in order', () => {

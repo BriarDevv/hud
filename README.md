@@ -1,6 +1,14 @@
 # hud
 
-My own Claude Code statusline — a single zero-dependency Node script.
+My own statuslines for AI coding agents — zero-dependency Node scripts, one
+folder per host.
+
+| Host | What it is | Entry point |
+|---|---|---|
+| Claude Code | External statusline command | `src/claude/statusline.mjs` |
+| Codex CLI | Native footer config + animated companion | `src/codex/statusline.mjs`, `src/codex/hud.mjs` |
+
+## Claude Code
 
 ```
 Model: Fable 5 | 5h:[--------]2%(4h37m) | wk:[#-------]9%(6d9h) | session:0m | ctx:[##--------]24%
@@ -19,14 +27,14 @@ Always one line (see `COLUMNS`/`LINES` in [Test](#test)).
 | `session:` | first transcript line timestamp | yellow >60m, red >120m |
 | `ctx:` | stdin `context_window.used_percentage` (+fallback math) | yellow ≥70, `COMPRESS?` ≥80, `CRITICAL` red ≥85 |
 
-## Install
+### Install
 
 `~/.claude/settings.json`:
 
 ```json
 "statusLine": {
   "type": "command",
-  "command": "node C:/Briar/repos/mine/hud/hud.mjs"
+  "command": "node C:/Briar/repos/mine/hud/src/claude/statusline.mjs"
 }
 ```
 
@@ -42,16 +50,16 @@ model → weekly → context used → total input → total output
 Install it globally with a recoverable backup:
 
 ```powershell
-node codex-statusline.mjs --check --preset hud
-node codex-statusline.mjs --install --preset hud
+node src/codex/statusline.mjs --check --preset hud
+node src/codex/statusline.mjs --install --preset hud
 ```
 
 For the exact aligned layout and living neon gradient, open a split terminal
 pane and run the companion there:
 
 ```powershell
-node codex-hud.mjs --once --cwd (Get-Location)
-node codex-hud.mjs --watch --cwd (Get-Location)
+node src/codex/hud.mjs --once --cwd (Get-Location)
+node src/codex/hud.mjs --watch --cwd (Get-Location)
 ```
 
 It renders only `model`, `weekly`, `context used`, and `28.8K in · 230 out`; the
@@ -59,16 +67,16 @@ model is text-only and bars exist only on the first two groups. The companion
 reads Codex rollout metadata, the active model, and token-count events only. It
 never reads credentials or prompt/response text.
 The existing `full` and `compact` native presets remain available. See
-[docs/codex-statusline.md](docs/codex-statusline.md) for the native/companion
+[docs/guides/codex.md](docs/guides/codex.md) for the native/companion
 boundary, animation behavior, backup flow, and version notes.
 
 ## Test
 
 ```
-node hud.mjs < test/sample-stdin.json
-echo {} | node hud.mjs
-COLUMNS=35 node hud.mjs < test/sample-stdin.json   # narrow terminal: shrinks
-node --test                                      # Claude/Codex regression tests
+node --test
+node src/claude/statusline.mjs < test/fixtures/claude-stdin.json
+echo {} | node src/claude/statusline.mjs
+COLUMNS=35 node src/claude/statusline.mjs < test/fixtures/claude-stdin.json
 ```
 
 Born as a replacement for the OMC HUD (reverse-engineered spec, reimplemented

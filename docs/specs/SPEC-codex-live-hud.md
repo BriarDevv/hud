@@ -73,7 +73,7 @@ than inventing zeroes.
 
 ### Native configuration
 
-Add a `hud` preset to `codex-statusline.mjs`:
+Add a `hud` preset to `src/codex/statusline.mjs`:
 
 ```text
 model-with-reasoning
@@ -89,7 +89,7 @@ want them.
 
 ### Companion renderer
 
-Create `codex-hud.mjs` as a pure renderer plus a small file watcher:
+Create `src/codex/hud.mjs` as a pure renderer plus a small file watcher:
 
 - `--once` renders one snapshot and exits, useful for tests and scripts.
 - `--watch` refreshes data once per second and animates the line every 120 ms.

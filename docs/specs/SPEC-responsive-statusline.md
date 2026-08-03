@@ -2,7 +2,7 @@
 
 ## Problem
 
-`hud.mjs` renders one long line. On a narrow terminal, the segments get
+`src/claude/statusline.mjs` renders one long line. On a narrow terminal, the segments get
 truncated/wrapped by the terminal itself, mid-segment, instead of
 degrading cleanly.
 
@@ -49,10 +49,10 @@ gracefully (fallback width), never throws.
 
 ## Testing
 
-- `node hud.mjs < test/sample-stdin.json` — default width (fallback 80).
-- `COLUMNS=200/90/60/35/15 node hud.mjs < test/sample-stdin.json` — walks
+- `node src/claude/statusline.mjs < test/fixtures/claude-stdin.json` — default width (fallback 80).
+- `COLUMNS=200/90/60/35/15 node src/claude/statusline.mjs < test/fixtures/claude-stdin.json` — walks
   through all 4 levels down to overflow.
-- `echo {} | node hud.mjs` at various `COLUMNS` — same levels via the
+- `echo {} | node src/claude/statusline.mjs` at various `COLUMNS` — same levels via the
   OAuth usage-API fallback path.
 
 ## Out of scope

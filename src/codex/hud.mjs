@@ -274,7 +274,7 @@ export function parseArgs(argv) {
 
 function usage() {
   return [
-    'Usage: node codex-hud.mjs [--once|--watch] [--cwd <path>] [--session <id>]',
+    'Usage: node src/codex/hud.mjs [--once|--watch] [--cwd <path>] [--session <id>]',
     '',
     '  --once     Render one line and exit (default).',
     '  --watch    Animate the line until Ctrl+C.',

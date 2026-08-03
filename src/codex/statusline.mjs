@@ -174,7 +174,7 @@ export function validateWithCodex(
 
 function usage() {
   return [
-    'Usage: node codex-statusline.mjs [--print|--check|--install] [--preset full|compact|hud]',
+    'Usage: node src/codex/statusline.mjs [--print|--check|--install] [--preset full|compact|hud]',
     '',
     '  --print    Print the native [tui] status_line TOML fragment (default).',
     '  --check    Validate the preset with the installed Codex CLI.',

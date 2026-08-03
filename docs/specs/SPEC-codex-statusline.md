@@ -10,7 +10,7 @@
 ## Context
 
 This repository is a zero-dependency Claude Code statusline renderer. Claude
-Code invokes `hud.mjs` as an external `statusLine.command` and supplies a JSON
+Code invokes `src/claude/statusline.mjs` as an external `statusLine.command` and supplies a JSON
 snapshot on stdin. The renderer owns formatting, ANSI colors, responsive
 shrinking, transcript-based session timing, and the Anthropic OAuth usage
 fallback.
@@ -35,7 +35,7 @@ reuse Claude's renderer inside the Codex TUI.
 5. Make installation opt-in, preserve unrelated user configuration, and create
    a recoverable backup before changing `CODEX_HOME/config.toml`.
 6. Document the difference between Claude's external renderer and Codex's
-   native footer so contributors do not expect `hud.mjs` to be executed by
+   native footer so contributors do not expect `src/claude/statusline.mjs` to be executed by
    Codex.
 7. Add deterministic tests for preset contents and configuration rewriting.
 
@@ -62,8 +62,8 @@ section.
 
 ### B. Native configuration plus a zero-dependency helper (recommended)
 
-Keep a canonical item catalog in the repository, expose a project-local
-`.codex/config.toml` using the full preset, and add `codex-statusline.mjs` with
+Keep a canonical item catalog in the repository and add
+`src/codex/statusline.mjs` with
 `--print`, `--check`, `--install`, and preset selection. `--install` is
 explicit, creates a timestamped backup, and updates only `tui.status_line`.
 
@@ -73,7 +73,7 @@ Claude renderer.
 
 ### C. Provider-neutral external renderer for both CLIs
 
-Refactor `hud.mjs` into a renderer that accepts Claude and Codex payloads and
+Refactor `src/claude/statusline.mjs` into a renderer that accepts Claude and Codex payloads and
 run it as a sidecar for Codex.
 
 This would make formatting more uniform, but Codex does not provide the
@@ -85,7 +85,7 @@ is rejected.
 
 ### Canonical Codex catalog
 
-`codex-statusline.mjs` owns one ordered catalog of the currently supported
+`src/codex/statusline.mjs` owns one ordered catalog of the currently supported
 Codex footer item IDs. The `full` preset includes:
 
 ```text
@@ -129,12 +129,12 @@ Codex's `/statusline` command.
 
 The helper remains zero-dependency and uses Node's standard library only.
 
-- `node codex-statusline.mjs --print --preset full` prints a valid `[tui]`
+- `node src/codex/statusline.mjs --print --preset full` prints a valid `[tui]`
   TOML fragment.
-- `node codex-statusline.mjs --check` verifies the catalog and, when a `codex`
+- `node src/codex/statusline.mjs --check` verifies the catalog and, when a `codex`
   executable is available, asks the installed CLI to parse the statusline
   override without starting an interactive session.
-- `node codex-statusline.mjs --install --preset full` resolves
+- `node src/codex/statusline.mjs --install --preset full` resolves
   `CODEX_HOME/config.toml` (falling back to the platform home directory), makes
   a timestamped backup when an existing file would change, and updates only
   the `status_line` key in the `[tui]` table. It creates the file and table if
@@ -142,7 +142,7 @@ The helper remains zero-dependency and uses Node's standard library only.
 - `--preset compact` is accepted by `--print` and `--install`.
 - Invalid flags, missing Codex, malformed target configuration, or filesystem
   errors produce a concise stderr message and a non-zero exit code; ordinary
-  renderer failure behavior in `hud.mjs` remains unchanged.
+  renderer failure behavior in `src/claude/statusline.mjs` remains unchanged.
 
 The configuration updater must preserve unrelated keys and comments. It must
 handle an existing `[tui]` table, a `[tui]` table followed by another table,
@@ -151,9 +151,14 @@ a backup when the requested value is already present.
 
 ### Repository configuration
 
-`.codex/config.toml` contains the full preset so Codex sessions started in this
-repository immediately demonstrate the native integration once the repository
-is trusted. It contains no provider, auth, notification, or telemetry settings.
+None. Codex resolves its config only from `CODEX_HOME/config.toml` (default
+`~/.codex/config.toml`), so a repo-local `.codex/config.toml` has no effect on
+a Codex session started in this repository. `.codex/` is gitignored and the
+footer is configured per machine via `--install`.
+
+> An earlier revision of this spec called for committing a project-local
+> `.codex/config.toml`. That was incorrect — Codex never reads it — and the
+> file has been removed.
 
 ### Documentation
 
@@ -162,7 +167,7 @@ is trusted. It contains no provider, auth, notification, or telemetry settings.
 - `AGENTS.md` describes the Codex-native surface and validation commands.
 - `CLAUDE.md` records that Claude remains the primary external renderer while
   Codex uses the native footer configuration.
-- `docs/codex-statusline.md` explains the field catalog, presets, safe install
+- `docs/guides/codex.md` explains the field catalog, presets, safe install
   behavior, and version boundary.
 
 ## Data flow
@@ -180,7 +185,7 @@ canonical item catalog
 Claude's existing flow remains separate:
 
 ```text
-Claude JSON stdin --> hud.mjs --> one ANSI statusline on stdout
+Claude JSON stdin --> src/claude/statusline.mjs --> one ANSI statusline on stdout
 ```
 
 ## Error handling and safety
@@ -216,9 +221,9 @@ Tests cover:
 ## Acceptance criteria
 
 - Claude's existing README commands still work.
-- `node codex-statusline.mjs --print --preset full` prints the complete native
+- `node src/codex/statusline.mjs --print --preset full` prints the complete native
   Codex configuration.
-- `node codex-statusline.mjs --check` succeeds against the installed Codex
+- `node src/codex/statusline.mjs --check` succeeds against the installed Codex
   CLI without opening the TUI.
 - The project-local Codex config contains the full preset only.
 - `--install` changes only `tui.status_line`, preserves unrelated content, and

@@ -12,9 +12,9 @@ That gives this repository two complementary surfaces:
 From the repository root:
 
 ```powershell
-node codex-statusline.mjs --check --preset hud
-node codex-statusline.mjs --print --preset hud
-node codex-statusline.mjs --install --preset hud
+node src/codex/statusline.mjs --check --preset hud
+node src/codex/statusline.mjs --print --preset hud
+node src/codex/statusline.mjs --install --preset hud
 ```
 
 `--check` is read-only and asks the installed Codex CLI to parse the item IDs.
@@ -39,13 +39,13 @@ animation.
 Open a split terminal pane next to Codex and run:
 
 ```powershell
-node codex-hud.mjs --watch --cwd (Get-Location)
+node src/codex/hud.mjs --watch --cwd (Get-Location)
 ```
 
 For a one-shot check:
 
 ```powershell
-node codex-hud.mjs --once --cwd (Get-Location)
+node src/codex/hud.mjs --once --cwd (Get-Location)
 ```
 
 The line is deliberately fixed and sparse:
@@ -75,7 +75,7 @@ and does not fail the process.
 Use `--session <id>` when several Codex sessions share the same directory:
 
 ```powershell
-node codex-hud.mjs --watch --cwd (Get-Location) --session <session-id>
+node src/codex/hud.mjs --watch --cwd (Get-Location) --session <session-id>
 ```
 
 ## Other presets
@@ -91,20 +91,22 @@ native information:
 Examples:
 
 ```powershell
-node codex-statusline.mjs --print --preset full
-node codex-statusline.mjs --install --preset compact
+node src/codex/statusline.mjs --print --preset full
+node src/codex/statusline.mjs --install --preset compact
 ```
 
-The project-local `.codex/config.toml` intentionally uses `hud` so a trusted
-repository session starts with the calm focused footer. No authentication,
-provider, notification, or telemetry settings are stored there.
+Codex reads its configuration only from `CODEX_HOME/config.toml` (default
+`~/.codex/config.toml`). A repo-local `.codex/config.toml` is never read by
+Codex, so this repository does not ship one — `.codex/` is gitignored. Run
+`--install` to configure the footer for your machine; it writes to the real
+config home and backs up whatever was there.
 
 ## Version compatibility
 
 Codex status item IDs are owned by the installed Codex version. Run
-`node codex-statusline.mjs --check --preset hud` after upgrading Codex. If a
+`node src/codex/statusline.mjs --check --preset hud` after upgrading Codex. If a
 future version changes the available IDs or rollout schema, update the catalog
 and companion parser together, then rerun `node --test`.
 
-Claude remains independent: Claude Code still invokes `hud.mjs`, reads its
+Claude remains independent: Claude Code still invokes `src/claude/statusline.mjs`, reads its
 JSON stdin payload, and receives the existing one-line ANSI output.

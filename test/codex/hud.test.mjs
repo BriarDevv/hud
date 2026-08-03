@@ -14,7 +14,7 @@ import {
   renderBar,
   renderLine,
   resolveCodexHome,
-} from '../codex-hud.mjs';
+} from '../../src/codex/hud.mjs';
 
 const TOKEN_COUNT_EVENT = {
   type: 'event_msg',

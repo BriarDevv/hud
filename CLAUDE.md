@@ -1,17 +1,28 @@
 # hud
 
-Standalone Claude Code statusline: one zero-dependency Node script rendering
-model, 5h/weekly rate-limit bars, session timer, and context bar. Replaces
-the OMC HUD.
+Statuslines for AI coding agents, one folder per host under `src/`. The
+Claude Code statusline (`src/claude/statusline.mjs`) is one zero-dependency
+Node script rendering model, 5h/weekly rate-limit bars, session timer, and
+context bar. Replaces the OMC HUD. Codex integration lives in `src/codex/`
+(see `## Codex compatibility`).
+
+## Layout
+
+`src/<host>/` renderers, `test/<host>/` tests, `test/fixtures/` sample
+payloads, `docs/guides/<host>.md` install docs. Nothing new goes in the repo
+root. Local tool state (`.codex/`, `.omc/`, `.worktrees/`) is gitignored.
 
 ## Commands
 
-- `node hud.mjs < test/sample-stdin.json` — render with the sample payload
-  (run from the repo root: the sample's transcript_path is relative)
-- `echo '{}' | node hud.mjs` — exercise the OAuth usage-API fallback path
-- `COLUMNS=35 node hud.mjs < test/sample-stdin.json` — simulate a narrow
-  terminal to check the shrink (PowerShell: `$env:COLUMNS=35; node hud.mjs
-  < test/sample-stdin.json`)
+- `node --test` — Codex regression tests (pass from any cwd)
+- `node src/claude/statusline.mjs < test/fixtures/claude-stdin.json` — render
+  with the sample payload (run from the repo root: the sample's
+  transcript_path is relative)
+- `echo '{}' | node src/claude/statusline.mjs` — exercise the OAuth usage-API
+  fallback path
+- `COLUMNS=35 node src/claude/statusline.mjs < test/fixtures/claude-stdin.json`
+  — simulate a narrow terminal to check the shrink (PowerShell:
+  `$env:COLUMNS=35; node src/claude/statusline.mjs < test/fixtures/claude-stdin.json`)
 
 ## Gotchas
 
@@ -24,7 +35,9 @@ the OMC HUD.
 - Session start is parsed from the FIRST line of the transcript (head read);
   a missing/unreadable transcript renders `session:0m`, not an error.
 - Wired in `~/.claude/settings.json` → `statusLine.command`; changes to
-  hud.mjs apply on the next statusline refresh, no restart needed.
+  `src/claude/statusline.mjs` apply on the next statusline refresh, no
+  restart needed. Moving or renaming that file breaks the statusline until
+  `settings.json` is updated to match.
 - Terminal width comes from the `COLUMNS` env var, which Claude Code sets
   to the live terminal size before each run (v2.1.153+) — `tput cols` and
   `process.stdout.columns` don't work since our stdout is captured, not
@@ -46,17 +59,20 @@ Codex CLI owns its TUI footer instead of invoking an external statusline
 command. The native focused preset therefore uses only
 `model-with-reasoning`, `weekly-limit`, `context-used`,
 `total-input-tokens`, and `total-output-tokens`, in that order. The companion
-`codex-hud.mjs` reads the active model and sanitized token-count events from
-rollout files to provide the exact aligned rainbow line in a separate
+`src/codex/hud.mjs` reads the active model and sanitized token-count events
+from rollout files to provide the exact aligned rainbow line in a separate
 PowerShell/terminal pane.
 
-- `node codex-statusline.mjs --check --preset hud` validates the installed
-  Codex parser without writing configuration.
-- `node codex-statusline.mjs --install --preset hud` updates
+- Codex reads only `CODEX_HOME/config.toml` (default `~/.codex/config.toml`).
+  A repo-local `.codex/` is never read by Codex — it is gitignored, not
+  committed.
+- `node src/codex/statusline.mjs --check --preset hud` validates the
+  installed Codex parser without writing configuration.
+- `node src/codex/statusline.mjs --install --preset hud` updates
   `CODEX_HOME/config.toml` only after an explicit request and creates a
   timestamped backup before changing an existing file.
-- `node codex-hud.mjs --once --cwd .` renders one deterministic line.
-- `node codex-hud.mjs --watch --cwd .` animates the gradient until Ctrl+C.
+- `node src/codex/hud.mjs --once --cwd .` renders one deterministic line.
+- `node src/codex/hud.mjs --watch --cwd .` animates the gradient until Ctrl+C.
 - The companion never reads auth files, prompt text, response text, or
   provider credentials.
 - `full` and `compact` remain available for contributors who need more native
