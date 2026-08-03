@@ -10,7 +10,8 @@
 
 import { readFileSync, writeFileSync, openSync, readSync, closeSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ---------- ANSI ----------
 const R = "\x1b[0m", DIM = "\x1b[2m";
@@ -18,16 +19,16 @@ const RED = "\x1b[31m", GREEN = "\x1b[32m", YELLOW = "\x1b[33m", CYAN = "\x1b[36
 const dim = (s) => `${DIM}${s}${R}`;
 const SEP = dim(" | ");
 
-const pctColor = (p) => (p >= 90 ? RED : p >= 70 ? YELLOW : GREEN);
-const clampPct = (p) => Math.min(100, Math.max(0, Math.round(p)));
+export const pctColor = (p) => (p >= 90 ? RED : p >= 70 ? YELLOW : GREEN);
+export const clampPct = (p) => Math.min(100, Math.max(0, Math.round(p)));
 
-function bar(pct, width, color) {
+export function bar(pct, width, color) {
   const filled = Math.round((pct / 100) * width);
   return `[${color}${"#".repeat(filled)}${R}${DIM}${"-".repeat(width - filled)}${R}]`;
 }
 
 // resetsAt (epoch seconds, epoch ms, or ISO string) -> epoch ms, or null if unparseable
-function resetMs(resetsAt) {
+export function resetMs(resetsAt) {
   if (!resetsAt) return null;
   const t = typeof resetsAt === "number"
     ? (Math.abs(resetsAt) < 1e12 ? resetsAt * 1000 : resetsAt)
@@ -36,10 +37,10 @@ function resetMs(resetsAt) {
 }
 
 // "4h38m" | "6d10h" | null when past/absent
-function formatReset(resetsAt) {
+export function formatReset(resetsAt, now = Date.now()) {
   const t = resetMs(resetsAt);
   if (t == null) return null;
-  const diff = t - Date.now();
+  const diff = t - now;
   if (diff <= 0) return null;
   const m = Math.floor(diff / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
   return d > 0 ? `${d}d${h % 24}h` : `${h}h${m % 60}m`;
@@ -48,12 +49,12 @@ function formatReset(resetsAt) {
 // stdin's rate_limits are a snapshot from the last API response — stale once its
 // window's resets_at is in the past (e.g. an idle session that hasn't sent a
 // message since the window rolled over).
-function isExpired(resetsAt) {
+export function isExpired(resetsAt, now = Date.now()) {
   const t = resetMs(resetsAt);
-  return t != null && t <= Date.now();
+  return t != null && t <= now;
 }
 
-function limitSegment(label, pct, resetsAt, { dimLabel = false, width = 8, showBar = true, showReset = true } = {}) {
+export function limitSegment(label, pct, resetsAt, { dimLabel = false, width = 8, showBar = true, showReset = true } = {}) {
   if (pct == null) return null;
   const p = clampPct(pct);
   const reset = showReset ? formatReset(resetsAt) : null;
@@ -73,12 +74,12 @@ async function readStdin() {
 }
 
 // ---------- segments ----------
-function modelSegment(stdin) {
+export function modelSegment(stdin) {
   const name = stdin?.model?.display_name?.trim() || stdin?.model?.id?.trim();
   return name ? `${CYAN}Model: ${name}${R}` : null;
 }
 
-function contextPercent(stdin) {
+export function contextPercent(stdin) {
   const cw = stdin?.context_window;
   if (!cw) return 0;
   if (cw.used_percentage > 0) return clampPct(cw.used_percentage);
@@ -89,7 +90,7 @@ function contextPercent(stdin) {
   return 0;
 }
 
-function contextSegment(stdin, { showBar = true } = {}) {
+export function contextSegment(stdin, { showBar = true } = {}) {
   const p = contextPercent(stdin);
   const color = p >= 85 ? RED : p >= 70 ? YELLOW : GREEN;
   const suffix = p >= 85 ? " CRITICAL" : p >= 80 ? " COMPRESS?" : "";
@@ -100,7 +101,7 @@ function contextSegment(stdin, { showBar = true } = {}) {
 // Session start = first timestamped transcript entry. The transcript opens with meta
 // lines (last-prompt, mode, permission-mode) that carry NO timestamp, so scan the head
 // until one appears; fall back to file birthtime.
-function sessionStartMs(path) {
+export function sessionStartMs(path) {
   try {
     const fd = openSync(path, "r");
     const buf = Buffer.alloc(65536);
@@ -117,17 +118,17 @@ function sessionStartMs(path) {
   } catch { return null; }
 }
 
-function sessionSegment(stdin) {
+export function sessionSegment(stdin, now = Date.now()) {
   let minutes = 0;
   const start = stdin?.transcript_path ? sessionStartMs(stdin.transcript_path) : null;
-  if (start) minutes = Math.max(0, Math.floor((Date.now() - start) / 60000));
+  if (start) minutes = Math.max(0, Math.floor((now - start) / 60000));
   const color = minutes > 120 ? RED : minutes > 60 ? YELLOW : GREEN;
   const label = minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h${minutes % 60}m`;
   return `session:${color}${label}${R}`;
 }
 
 // ---------- rate limits: stdin first, OAuth usage API fallback ----------
-function limitsFromStdin(stdin) {
+export function limitsFromStdin(stdin) {
   const rl = stdin?.rate_limits;
   if (rl?.five_hour?.used_percentage == null && rl?.seven_day?.used_percentage == null) return null;
   return {
@@ -179,20 +180,20 @@ async function limitsFromApi() {
 // ever observed) falls back to 80, leaning toward shrinking over assuming wide.
 const COLUMNS_CACHE_FILE = join(tmpdir(), "hud-columns-cache.json");
 
-function terminalWidth() {
-  const cols = parseInt(process.env.COLUMNS, 10);
+export function terminalWidth(env = process.env, cacheFile = COLUMNS_CACHE_FILE) {
+  const cols = parseInt(env.COLUMNS, 10);
   if (Number.isFinite(cols) && cols > 0) {
-    try { writeFileSync(COLUMNS_CACHE_FILE, String(cols)); } catch { /* best effort */ }
+    try { writeFileSync(cacheFile, String(cols)); } catch { /* best effort */ }
     return cols;
   }
   try {
-    const cached = parseInt(readFileSync(COLUMNS_CACHE_FILE, "utf8"), 10);
+    const cached = parseInt(readFileSync(cacheFile, "utf8"), 10);
     if (Number.isFinite(cached) && cached > 0) return cached;
   } catch { /* no cache yet */ }
   return 80;
 }
 
-function visibleWidth(str) {
+export function visibleWidth(str) {
   return str.replace(/\x1b\[[0-9;]*m/g, "").length;
 }
 
@@ -203,7 +204,7 @@ function visibleWidth(str) {
 // most worth a glance even in the tightest terminal. Each level is tried in order
 // and the first that fits `width` on one line wins; if even the barest level
 // doesn't fit, it's printed anyway (overflow, never truncated).
-function buildLevels(stdin, limits) {
+export function buildLevels(stdin, limits) {
   const model = modelSegment(stdin);
   const session = sessionSegment(stdin);
   const ctx = contextSegment(stdin);
@@ -220,7 +221,7 @@ function buildLevels(stdin, limits) {
   return levels.map((segs) => segs.filter(Boolean));
 }
 
-function renderLine(levels, width) {
+export function renderLine(levels, width) {
   for (const segs of levels) {
     const line = segs.join(SEP);
     if (visibleWidth(line) <= width) return line;
@@ -238,4 +239,8 @@ async function main() {
   console.log(renderLine(levels, terminalWidth()));
 }
 
-main().catch(() => console.log(`${DIM}hud: err${R}`));
+// Run only when invoked as a script, so tests can import the helpers above
+// without the renderer firing (and blocking on stdin).
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch(() => console.log(`${DIM}hud: err${R}`));
+}
