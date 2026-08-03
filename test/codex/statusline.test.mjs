@@ -15,16 +15,19 @@ import {
   renderToml,
   resolveCodexConfigPath,
   updateConfigText,
+  validateWithCodex,
 } from '../../src/codex/statusline.mjs';
 
 const CLI = fileURLToPath(new URL('../../src/codex/statusline.mjs', import.meta.url));
 
 const FULL = [
-  'model-with-reasoning', 'context-used', 'context-remaining',
-  'five-hour-limit', 'weekly-limit', 'used-tokens',
-  'total-input-tokens', 'total-output-tokens', 'git-branch',
-  'current-dir', 'project-name', 'run-state', 'task-progress',
-  'fast-mode', 'thread-id', 'thread-title', 'codex-version', 'actions',
+  'model', 'model-with-reasoning', 'reasoning', 'current-dir',
+  'project-name', 'git-branch', 'pull-request-number', 'branch-changes',
+  'run-state', 'permissions', 'approval-mode', 'context-remaining',
+  'context-used', 'five-hour-limit', 'weekly-limit', 'codex-version',
+  'context-window-size', 'used-tokens', 'total-input-tokens',
+  'total-output-tokens', 'thread-id', 'fast-mode', 'raw-output',
+  'thread-title', 'workspace-headline', 'task-progress',
 ];
 
 test('full preset contains every supported Codex footer item once', () => {
@@ -49,6 +52,8 @@ test('renderToml emits a complete native Codex fragment', () => {
   assert.match(toml, /^\[tui\]\nstatus_line = \[/);
   assert.match(toml, /"model-with-reasoning"/);
   assert.match(toml, /"run-state"/);
+  assert.match(toml, /status_line_use_colors = true/);
+  assert.match(toml, /animations = true/);
   assert.doesNotMatch(toml, /token|secret|password|auth/i);
 });
 
@@ -60,6 +65,26 @@ test('updateConfigText replaces status_line without disturbing other tui setting
   assert.match(result.text, /\[features\]\nfast = true/);
   assert.match(result.text, /status_line = \["model-with-reasoning"/);
   assert.doesNotMatch(result.text, /status_line = \["old"\]/);
+  assert.match(result.text, /status_line_use_colors = true/);
+  assert.match(result.text, /animations = true/);
+});
+
+test('updateConfigText enables native Codex visuals without duplicating keys', () => {
+  const original = '[tui]\nstatus_line = ["old"]\nstatus_line_use_colors = false\nanimations = false\n';
+  const result = updateConfigText(original, PRESETS.hud);
+  assert.equal((result.text.match(/^status_line_use_colors\s*=/gm) || []).length, 1);
+  assert.equal((result.text.match(/^animations\s*=/gm) || []).length, 1);
+  assert.match(result.text, /status_line_use_colors = true/);
+  assert.match(result.text, /animations = true/);
+});
+
+test('updateConfigText replaces a multiline status_line atomically', () => {
+  const original = '[tui]\nstatus_line = [\n  "old",\n]\nnotifications = true\n';
+  const result = updateConfigText(original, PRESETS.hud);
+  assert.equal((result.text.match(/^status_line\s*=/gm) || []).length, 1);
+  assert.match(result.text, /notifications = true/);
+  assert.doesNotMatch(result.text, /"old"/);
+  assert.doesNotMatch(result.text, /^\s*]\s*$/m);
 });
 
 test('updateConfigText creates tui when it is missing', () => {
@@ -106,6 +131,22 @@ test('installPreset preserves unrelated config and creates one backup', () => {
   assert.equal(readFileSync(result.backupPath, 'utf8'), original);
 });
 
+test('installPreset never overwrites a same-timestamp backup', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hud-codex-'));
+  const configPath = join(root, 'config.toml');
+  const original = 'model = "gpt-5"\n';
+  writeFileSync(configPath, original);
+  const now = new Date('2026-08-02T12:34:56.789Z');
+  const firstBackup = formatBackupPath(configPath, now);
+  writeFileSync(firstBackup, 'older backup\n');
+
+  const result = installPreset({ configPath, items: PRESETS.hud, now });
+
+  assert.notEqual(result.backupPath, firstBackup);
+  assert.equal(readFileSync(firstBackup, 'utf8'), 'older backup\n');
+  assert.equal(readFileSync(result.backupPath, 'utf8'), original);
+});
+
 test('installPreset does not rewrite an unchanged config', () => {
   const root = mkdtempSync(join(tmpdir(), 'hud-codex-'));
   const configPath = join(root, 'config.toml');
@@ -113,6 +154,26 @@ test('installPreset does not rewrite an unchanged config', () => {
   writeFileSync(configPath, expected);
   const result = installPreset({ configPath, items: PRESETS.compact, now: new Date() });
   assert.deepEqual(result, { changed: false, configPath, backupPath: null });
+});
+
+test('validateWithCodex validates the statusline and native visual settings together', () => {
+  const calls = [];
+  const fakeSpawn = (...args) => {
+    calls.push(args);
+    return { status: 0, stdout: '', stderr: '' };
+  };
+
+  assert.equal(validateWithCodex(PRESETS.hud, 'codex', fakeSpawn), true);
+  assert.deepEqual(calls[0][1], [
+    '--strict-config',
+    '-c',
+    `tui.status_line=${JSON.stringify(PRESETS.hud)}`,
+    '-c',
+    'tui.status_line_use_colors=true',
+    '-c',
+    'tui.animations=true',
+    '--help',
+  ]);
 });
 
 test('CLI --print outputs the requested fragment without creating files', () => {

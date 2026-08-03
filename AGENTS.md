@@ -17,9 +17,14 @@ Claude Code invokes `src/claude/statusline.mjs` through its external
 `.codex/` directory is never read by Codex and must not be committed. Use
 `node src/codex/statusline.mjs --install --preset hud` to configure
 `tui.status_line`. The focused HUD starts with the active model, followed by
-weekly, context used, and total input/output. The companion reads only rollout
-metadata and token-count events because Codex does not provide an external
-footer command hook.
+weekly, context used, and total input/output. The helper also enables Codex's
+native status-line theme colors and built-in animations. A new Codex process is
+required after changing `config.toml`.
+
+Codex does not provide an external footer command hook. `src/codex/hud.mjs` is
+therefore an opt-in standalone companion for a separate terminal pane; it
+reads only rollout metadata and token-count events and must not be described as
+the native or global footer.
 
 New host integrations go in `src/<host>/`, with tests in `test/<host>/` and a
 guide in `docs/guides/<host>.md`. Never add files to the repo root.

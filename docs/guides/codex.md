@@ -1,13 +1,17 @@
-# Codex statusline and live HUD
+# Codex statusline and optional live HUD
 
-Codex CLI owns its TUI footer. It reads an ordered `tui.status_line` array
-from `config.toml`, but it does not execute an external statusline command.
-That gives this repository two complementary surfaces:
+Codex CLI owns its TUI footer. This repository can select Codex's built-in
+status items through `tui.status_line`, but it cannot inject a command,
+arbitrary ANSI, custom punctuation, or a continuously animated bar into that
+footer.
 
-1. a native, compatible footer preset for Codex itself;
-2. a zero-dependency companion line for exact formatting and animation.
+That boundary is intentional:
 
-## Focused setup
+1. the native preset is the supported, global Codex integration;
+2. `src/codex/hud.mjs` is an optional standalone renderer for a separate terminal
+   pane when exact bars and animation are wanted.
+
+## Focused native setup
 
 From the repository root:
 
@@ -17,26 +21,32 @@ node src/codex/statusline.mjs --print --preset hud
 node src/codex/statusline.mjs --install --preset hud
 ```
 
-`--check` is read-only and asks the installed Codex CLI to parse the item IDs.
-`--print` emits a copyable TOML fragment. `--install` is the only command that
-writes user configuration; it updates `CODEX_HOME/config.toml` (or
-`~/.codex/config.toml`) and creates a timestamped `.bak-*` copy before changing
-an existing file.
+`--check` is read-only. It asks the installed Codex CLI to parse the selected
+item IDs together with the native visual settings; it does not claim to render
+the TUI. `--print` emits a copyable TOML fragment. `--install` is the only
+command that writes user configuration; it updates `CODEX_HOME/config.toml`
+(or `~/.codex/config.toml`) and creates a timestamped `.bak-*` copy before
+changing an existing file.
 
-The focused native preset is exactly:
+The focused native preset is:
 
 ```toml
 [tui]
 status_line = ["model-with-reasoning", "weekly-limit", "context-used", "total-input-tokens", "total-output-tokens"]
+status_line_use_colors = true
+animations = true
 ```
 
-Codex supplies the values and native labels. Its supported config surface does
-not allow this repository to control ANSI colors, punctuation, or a continuous
-animation.
+The order is model, weekly, context used, input, output. Codex supplies the
+values, labels, separators, and layout. `status_line_use_colors` uses the
+active Codex syntax theme. `animations` enables Codex's own welcome, shimmer,
+and spinner animations; neither setting turns the footer into a custom
+rainbow bar. Close and reopen Codex after installing because the TUI loads the
+configuration when the process starts.
 
-## Live companion
+## Optional standalone renderer
 
-Open a split terminal pane next to Codex and run:
+Run this only when a second terminal pane is acceptable:
 
 ```powershell
 node src/codex/hud.mjs --watch --cwd (Get-Location)
@@ -54,22 +64,15 @@ The line is deliberately fixed and sparse:
 model gpt-5.6-luna  │  weekly       [███████████░] 95%  │  context used [█░░░░░░░░░░░] 11%  │  28.8K in · 230 out
 ```
 
-The model is text-only. Only `weekly` and `context used` have bars. The bars
-are 12 cells wide and filled cells cycle through a restrained neon aurora of
-violet, cyan, mint, lime, amber, and magenta every 120 ms. The data snapshot
-refreshes once per second, so the gradient remains alive when the values are
-idle. Set `NO_COLOR` or pipe `--once` to receive plain Unicode output.
+Only `weekly` and `context used` have bars. The bars are 12 cells wide and
+cycle through a restrained neon aurora every 120 ms, including while values
+are idle. Set `NO_COLOR` or pipe `--once` to receive plain Unicode output.
 
-The companion reads only:
-
-- the newest matching `session_meta` working directory;
-- the latest `turn_context` model;
-- the latest `event_msg` with `payload.type == "token_count"`;
-- weekly usage from the 10,080-minute rate-limit window;
-- model context capacity and total input/output token counts.
-
-It never reads `auth.json`, credentials, prompt text, response text, or
-provider secrets. Missing or partially written data produces `--` placeholders
+This process is not launched by Codex, does not alter the Codex TUI, and is
+not made global by the native config preset. It reads only the newest matching
+rollout's working directory, model, usage limits, context capacity, and token
+counts. It never reads `auth.json`, credentials, prompt text, response text,
+or provider secrets. Missing or partially written data produces placeholders
 and does not fail the process.
 
 Use `--session <id>` when several Codex sessions share the same directory:
@@ -80,10 +83,9 @@ node src/codex/hud.mjs --watch --cwd (Get-Location) --session <session-id>
 
 ## Other presets
 
-The helper preserves the previous presets for contributors who want more
-native information:
+The helper keeps two additional native presets:
 
-- `full`: every useful item exposed by the installed Codex CLI;
+- `full`: the built-in status item IDs cataloged for Codex 0.146;
 - `compact`: model/reasoning, remaining context, both limits, Git branch, and
   run state;
 - `hud`: the five-item focused footer described above.
@@ -96,10 +98,10 @@ node src/codex/statusline.mjs --install --preset compact
 ```
 
 Codex reads its configuration only from `CODEX_HOME/config.toml` (default
-`~/.codex/config.toml`). A repo-local `.codex/config.toml` is never read by
-Codex, so this repository does not ship one — `.codex/` is gitignored. Run
-`--install` to configure the footer for your machine; it writes to the real
-config home and backs up whatever was there.
+`~/.codex/config.toml`). A repo-local `.codex/` is never read by Codex, so it
+is gitignored and not committed. Run `--install` to configure the footer for
+your machine; it writes to the real config home and backs up whatever was
+there.
 
 ## Version compatibility
 
@@ -108,5 +110,6 @@ Codex status item IDs are owned by the installed Codex version. Run
 future version changes the available IDs or rollout schema, update the catalog
 and companion parser together, then rerun `node --test`.
 
-Claude remains independent: Claude Code still invokes `src/claude/statusline.mjs`, reads its
-JSON stdin payload, and receives the existing one-line ANSI output.
+Claude remains independent: Claude Code still invokes
+`src/claude/statusline.mjs`, reads its JSON stdin payload, and receives the
+existing one-line ANSI output.
