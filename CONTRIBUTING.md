@@ -30,10 +30,13 @@ host's own config home instead.
 ## Before opening a PR
 
 ```
-node --test
+npm test        # or: node --test
 node src/claude/statusline.mjs < test/fixtures/claude-stdin.json
 echo {} | node src/claude/statusline.mjs
 ```
+
+There is nothing to install — `package.json` declares no dependencies and CI
+fails if that ever changes. Node 20 or newer.
 
 CI runs the same commands on Linux and Windows against Node 20 and 24, plus
 the layout checks. Tests must pass from any working directory — resolve paths
