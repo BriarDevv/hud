@@ -48,6 +48,17 @@ order:
 model → weekly → context used → total input → total output
 ```
 
+Once installed, Codex's own footer renders something like:
+
+```text
+gpt-5.6-luna · reasoning: high   weekly 9%   context used 24%   128K in · 3.2K out
+```
+
+Codex draws the exact glyphs, spacing, and theme color — this is only the
+value order, not a byte-for-byte render. `--install` also writes
+`status_line_use_colors = true` and `animations = true`, so this footer
+picks up Codex's active theme colors and its own shimmer/spinner motion.
+
 Install it globally with a recoverable backup:
 
 ```powershell
