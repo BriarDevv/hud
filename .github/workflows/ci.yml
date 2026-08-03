@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['20', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # No install step on purpose: every script here must stay zero-dependency.
+      - name: Tests
+        run: node --test
+
+      - name: Claude statusline renders the sample payload
+        shell: bash
+        run: node src/claude/statusline.mjs < test/fixtures/claude-stdin.json
+
+      - name: Claude statusline degrades on an empty payload
+        shell: bash
+        run: echo '{}' | node src/claude/statusline.mjs
+
+      - name: Claude statusline shrinks on a narrow terminal
+        shell: bash
+        run: COLUMNS=35 node src/claude/statusline.mjs < test/fixtures/claude-stdin.json
+
+      - name: Codex preset prints valid TOML
+        shell: bash
+        run: node src/codex/statusline.mjs --print --preset hud
+
+  structure:
+    name: structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The layout contract in CONTRIBUTING.md, enforced: renderers belong in
+      # src/<host>/, and the root is reserved for project-level files.
+      - name: Repo root holds no stray files
+        shell: bash
+        run: |
+          allowed=$(printf '%s\n' \
+            .claude .git .github .gitattributes .gitignore \
+            AGENTS.md CLAUDE.md CODE_OF_CONDUCT.md CONTRIBUTING.md \
+            LICENSE README.md SECURITY.md \
+            docs src test | sort)
+          actual=$(ls -A | sort)
+          stray=$(comm -13 <(echo "$allowed") <(echo "$actual"))
+          if [ -n "$stray" ]; then
+            echo "::error::Unexpected entries in the repo root:"
+            echo "$stray"
+            echo "Put renderers in src/<host>/, tests in test/<host>/, docs in docs/."
+            exit 1
+          fi
+          echo "Repo root is clean."
+
+      - name: No local tool config is committed
+        shell: bash
+        run: |
+          tracked=$(git ls-files '.codex/*' '.omc/*' '.worktrees/*' '.claude/settings.local.json')
+          if [ -n "$tracked" ]; then
+            echo "::error::Local tool state must not be committed:"
+            echo "$tracked"
+            exit 1
+          fi
+          echo "No local tool config tracked."
